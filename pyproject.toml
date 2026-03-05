@@ -1,0 +1,10 @@
+[project]
+name = "adaptivecompanion"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mypy>=1.19.1",
+    "pocketflow>=0.0.3",
+]
