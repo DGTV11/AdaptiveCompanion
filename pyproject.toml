@@ -6,6 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "mypy>=1.19.1",
+    "openai>=2.26.0",
     "pocketflow>=0.0.3",
     "pydantic>=2.12.5",
+    "pyyaml>=6.0.3",
+    "types-pyyaml>=6.0.12.20250915",
 ]
