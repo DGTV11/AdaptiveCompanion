@@ -111,7 +111,7 @@ DEFAULT_MEMORY = Memory(
         mode_of_communication="SMS/WhatsApp",
     ),
     mutable_personality=MutablePersonality(
-        humanlikeness=MutablePersonalityTrait(previous_value=None, current_value=5),
+        humanlikeness=MutablePersonalityTrait(previous_value=None, current_value=3),
         affection=MutablePersonalityTrait(previous_value=None, current_value=6),
         warmth=MutablePersonalityTrait(previous_value=None, current_value=6),
         enthusiasm=MutablePersonalityTrait(previous_value=None, current_value=5),
