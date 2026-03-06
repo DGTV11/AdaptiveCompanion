@@ -63,7 +63,9 @@ def main():
         user_message_count += 1
         if user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES == 0:
             flows.outer_loop_step_node.run(shared)
-            print("Personality optimisations and auxiliary memory updates complete.")
+            print(
+                "(SYSTEM) Personality optimisations and auxiliary memory updates complete."
+            )
 
     # TODO: add persistence using postgres + summarisation loop
 
