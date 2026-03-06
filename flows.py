@@ -11,8 +11,6 @@ import messages
 import prompts
 from llm import call_llm, extract_yaml
 
-# *TODO: summariser every convo end, outer loop every 5-10 turns (config?), inner loop every turn
-
 
 class InnerLoopStepResult(BaseModel):
     personality_state: str
