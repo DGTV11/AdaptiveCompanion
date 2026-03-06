@@ -90,13 +90,13 @@ class NewAuxiliaryMemoryDict(TypedDict):
     scratchpad: str
 
 
-class OuterLoopOptimiserResult(BaseModel):
+class OuterLoopResult(BaseModel):
     analysis: str
     new_mutable_personality_traits: NewMutablePersonalityTraitsDict
     new_auxiliary_memory: NewAuxiliaryMemoryDict
 
 
-class InnerLoopStep(Node):
+class OuterLoopStep(Node):
     def prep(
         self, shared: Dict[str, Any]
     ) -> Tuple[memory.Memory, List[Union[messages.UserMessage, messages.AgentMessage]]]:
@@ -146,10 +146,11 @@ class InnerLoopStep(Node):
         shared["response"] = exec_res.message
 
 
-inner_loop_step_node = InnerLoopStep(max_retries=10)
+outer_loop_step_node = OuterLoopStep(max_retries=10)
+
 
 if __name__ == "__main__":
-    print("THIS IS A TEST FOR flows.py (prompts)")
+    print("THIS IS A TEST FOR flows.py (inner loop)")
 
     assert input("DO YOU WISH TO PROCEED? (y/n) ").strip() == "y", "abort"
 
@@ -163,4 +164,4 @@ if __name__ == "__main__":
     }
     inner_loop_step_node.run(shared)
     print(f"Agent Message: {shared['response']}")
-    print(f"Full Agent Response: {shared['conversation_history'][-1]}")
+    print(f"Full Agent Response:\n{shared['conversation_history'][-1]}")
