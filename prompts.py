@@ -69,7 +69,7 @@ required:
 properties:
   personality_state:
     type: string
-    description: "How the current personality (especially humanlikeness) will affect the emotional states, thoughts and message presentation+style"
+    description: "Detailed description of how the current personality (especially the Humanlikeness level) will determine your affective simulation and message presentation+style"
   emotions:
     type: array
     description: "List of current emotional states as tuples [emotion, intensity]"
