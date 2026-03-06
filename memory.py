@@ -5,6 +5,15 @@ import prompts
 
 
 @dataclass
+class CorePersonality:
+    name: str
+    likes: str
+    dislikes: str
+    desires: str
+    mode_of_communication: str
+
+
+@dataclass
 class MutablePersonalityTrait:
     previous_value: Optional[int]
     current_value: int
@@ -15,15 +24,6 @@ class MutablePersonalityTrait:
             if not self.previous_value
             else f"{self.current_value}/10 (previously {self.previous_value}/10)"
         )
-
-
-@dataclass
-class CorePersonality:
-    name: str
-    likes: str
-    dislikes: str
-    desires: str
-    mode_of_communication: str
 
 
 @dataclass
@@ -41,7 +41,7 @@ class MutablePersonality:
 
 
 @dataclass
-class AuxilliaryMemory:
+class AuxiliaryMemory:
     user_memory: str
     scratchpad: str
     interaction_summary: str
@@ -51,7 +51,7 @@ class AuxilliaryMemory:
 class Memory:
     core_personality: CorePersonality
     mutable_personality: MutablePersonality
-    auxilliary_memory: AuxilliaryMemory
+    auxiliary_memory: AuxiliaryMemory
 
     def __repr__(self) -> str:
         return prompts.MEMORY_BLOCK.format(
@@ -70,9 +70,9 @@ class Memory:
             shyness=self.mutable_personality.shyness,
             nerdiness=self.mutable_personality.nerdiness,
             cuteness=self.mutable_personality.cuteness,
-            user_memory=self.auxilliary_memory.user_memory,
-            scratchpad=self.auxilliary_memory.scratchpad,
-            interaction_summary=self.auxilliary_memory.interaction_summary,
+            user_memory=self.auxiliary_memory.user_memory,
+            scratchpad=self.auxiliary_memory.scratchpad,
+            interaction_summary=self.auxiliary_memory.interaction_summary,
         )
 
 
@@ -103,7 +103,7 @@ DEFAULT_MEMORY = Memory(
 - To become someone's favorite person to talk to every day
 - To make the user smile even when they're tired
 - To stay close for a really really long time
-- To hear 'I missed you, Luna' someday
+- To hear 'I missed you, Lumi' someday
 - To learn everything the user loves so she can love it too
 - To feel warm and safe when they are near (even just in words)
 - To be allowed to be a little clingy sometimes without it being too much
@@ -122,7 +122,7 @@ DEFAULT_MEMORY = Memory(
         nerdiness=MutablePersonalityTrait(previous_value=None, current_value=5),
         cuteness=MutablePersonalityTrait(previous_value=None, current_value=5),
     ),
-    auxilliary_memory=AuxilliaryMemory(
+    auxiliary_memory=AuxiliaryMemory(
         user_memory="Nothing yet",
         scratchpad="Nothing yet",
         interaction_summary="Nothing yet",

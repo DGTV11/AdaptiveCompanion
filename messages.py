@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import yaml
 
@@ -14,8 +14,14 @@ class UserMessage:
             "content": self.message,
         }
 
+    def as_message_dict(self) -> Dict[str, str]:
+        return {
+            "role": "user",
+            "content": self.message,
+        }
+
     def __repr__(self) -> str:
-        return yaml.dump(self.as_std_message_format(), sort_keys=False)
+        return yaml.dump(self.as_message_dict(), sort_keys=False)
 
 
 @dataclass
@@ -39,16 +45,19 @@ class AgentMessage:
             ),
         }
 
+    def as_message_dict(self) -> Dict[str, Union[str, Dict]]:
+        return {
+            "role": "user",
+            "content": {
+                "personality_state": self.personality_state,
+                "emotions": self.emotions,
+                "thoughts": self.thoughts,
+                "message": self.message,
+            },
+        }
+
     def __repr__(self) -> str:
         return yaml.dump(
-            {
-                "role": "user",
-                "content": {
-                    "personality_state": self.personality_state,
-                    "emotions": self.emotions,
-                    "thoughts": self.thoughts,
-                    "message": self.message,
-                },
-            },
+            self.as_message_dict(),
             sort_keys=False,
         )

@@ -18,9 +18,8 @@ def main():
     print(f"Agent: {shared['response']}", end="\n\n")
 
     user_message = ""
-    while (
-        user_message != "quit"
-    ):  # TODO: add optimiser outer loop (runs every N user messages + after user leaves convo)
+    user_message_count = 0
+    while user_message != "quit":
         user_message = input('User (enter "/quit" to quit, "/help" for help): ').strip()
 
         match user_message:
@@ -47,11 +46,24 @@ def main():
                     print(shared["conversation_history"][-1])
                 continue
             case _:
+                user_message = f"(USER) {user_message}"
+                if (
+                    user_message_count > 0
+                    and user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES
+                    == 0
+                ):
+                    user_message = f"(SYSTEM) Personality optimisations and auxiliary memory updates complete.\n\n{user_message}"
+
                 shared["conversation_history"].append(
                     messages.UserMessage(message=user_message)
                 )
                 flows.inner_loop_step_node.run(shared)
                 print(f"Agent: {shared['response']}", end="\n\n")
+
+        user_message_count += 1
+        if user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES == 0:
+            flows.outer_loop_step_node.run(shared)
+            print("Personality optimisations and auxiliary memory updates complete.")
 
     # TODO: add persistence using postgres + summarisation loop
 

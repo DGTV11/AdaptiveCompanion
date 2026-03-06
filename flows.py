@@ -1,5 +1,7 @@
+from dataclasses import fields
 from typing import Annotated, Any, Dict, List, Tuple, Union
 
+import yaml
 from pocketflow import Flow, Node
 from pydantic import BaseModel, conint
 from typing_extensions import TypedDict
@@ -72,7 +74,7 @@ class InnerLoopStep(Node):
 inner_loop_step_node = InnerLoopStep(max_retries=10)
 
 
-class NewMutablePersonalityTraitsDict(TypedDict):
+class NewMutablePersonalityDict(TypedDict):
     humanlikeness: Annotated[int, conint(ge=0, le=10)]
     affection: Annotated[int, conint(ge=0, le=10)]
     warmth: Annotated[int, conint(ge=0, le=10)]
@@ -90,9 +92,9 @@ class NewAuxiliaryMemoryDict(TypedDict):
     scratchpad: str
 
 
-class OuterLoopResult(BaseModel):
+class OuterLoopStepResult(BaseModel):
     analysis: str
-    new_mutable_personality_traits: NewMutablePersonalityTraitsDict
+    new_mutable_personality: NewMutablePersonalityDict
     new_auxiliary_memory: NewAuxiliaryMemoryDict
 
 
@@ -109,21 +111,29 @@ class OuterLoopStep(Node):
         prep_res: Tuple[
             memory.Memory, List[Union[messages.UserMessage, messages.AgentMessage]]
         ],
-    ) -> InnerLoopStepResult:
+    ) -> OuterLoopStepResult:
         memory, conversation_history = prep_res
 
         resp = call_llm(
             [
                 {
                     "role": "system",
-                    "content": prompts.INNER_LOOP_AGENT_PROMPT.format(memory=memory),
-                }
+                    "content": prompts.OUTER_LOOP_OPTIMISER_PROMPT.format(
+                        memory=memory
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": yaml.dump(
+                        [message.as_message_dict() for message in conversation_history],
+                        sort_keys=False,
+                    ),
+                },
             ]
-            + [message.as_std_message_format() for message in conversation_history]
         )
 
         result = extract_yaml(resp)
-        result_validated = InnerLoopStepResult.model_validate(result)
+        result_validated = OuterLoopStepResult.model_validate(result)
 
         return result_validated
 
@@ -133,17 +143,32 @@ class OuterLoopStep(Node):
         prep_res: Tuple[
             memory.Memory, List[Union[messages.UserMessage, messages.AgentMessage]]
         ],
-        exec_res: InnerLoopStepResult,
+        exec_res: OuterLoopStepResult,
     ):
-        shared["conversation_history"].append(
-            messages.AgentMessage(
-                personality_state=exec_res.personality_state,
-                emotions=exec_res.emotions,
-                thoughts=exec_res.thoughts,
-                message=exec_res.message,
+        memory, conversation_history = prep_res
+
+        # *Update Mutable Personality
+        new_mutable_personality = exec_res.new_mutable_personality
+        mutable_personality = memory.mutable_personality
+
+        for trait_field in fields(mutable_personality):
+            trait_name = trait_field.name
+            # print(trait_name)
+            assert trait_name in new_mutable_personality.keys()
+            mutable_personality_trait = getattr(mutable_personality, trait_name)
+            mutable_personality_trait.previous_value = (
+                mutable_personality_trait.current_value
             )
-        )
-        shared["response"] = exec_res.message
+            mutable_personality_trait.current_value = new_mutable_personality[
+                trait_name
+            ]
+
+        # *Update Auxiliary Memory
+        auxiliary_memory = memory.auxiliary_memory
+        new_auxiliary_memory = exec_res.new_auxiliary_memory
+
+        auxiliary_memory.user_memory = new_auxiliary_memory["user_memory"]
+        auxiliary_memory.scratchpad = new_auxiliary_memory["scratchpad"]
 
 
 outer_loop_step_node = OuterLoopStep(max_retries=10)

@@ -2,7 +2,9 @@ from os import getenv
 
 import yaml
 
-OPTIMISER_FREQUENCY_IN_MESSAGES = int(getenv("CHUNK_MAX_TOKENS") or "7")
+OPTIMISER_FREQUENCY_IN_USER_MESSAGES = int(
+    getenv("OPTIMISER_FREQUENCY_IN_USER_MESSAGES") or "7"
+)
 
 POSTGRES_USER = str(getenv("POSTGRES_USER"))
 POSTGRES_PASSWORD = str(getenv("POSTGRES_PASSWORD"))
