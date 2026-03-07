@@ -15,7 +15,7 @@ def main():
         ],
     }
     flows.inner_loop_step_node.run(shared)
-    print(f"Agent: {shared['response']}", end="\n\n")
+    print(f"Agent: {shared['message']}", end="\n\n")
 
     user_message = ""
     user_message_count = 0
@@ -43,7 +43,7 @@ def main():
                 if len(shared["conversation_history"]) == 0:
                     print("No last agent full response")
                 else:
-                    print(shared["conversation_history"][-1])
+                    print(shared["last_response"])
                 continue
             case _:
                 user_message = f"(USER) {user_message}"
@@ -58,16 +58,20 @@ def main():
                     messages.UserMessage(message=user_message)
                 )
                 flows.inner_loop_step_node.run(shared)
-                print(f"Agent: {shared['response']}", end="\n\n")
+                print(f"Agent: {shared['message']}", end="\n\n")
 
         user_message_count += 1
         if user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES == 0:
-            flows.outer_loop_step_node.run(shared)
+            flows.outer_loop_optimiser_step_node.run(shared)
+            flows.outer_loop_summariser_step_node.run(shared)
+
+            shared["conversation_history"] = shared["conversation_history"][-2:]
+
             print(
                 "(SYSTEM) Personality optimisations and auxiliary memory updates complete."
             )
 
-    # TODO: add persistence using postgres + summarisation loop
+    # TODO: add persistence using postgres
 
 
 if __name__ == "__main__":

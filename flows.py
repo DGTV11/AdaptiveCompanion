@@ -58,15 +58,14 @@ class InnerLoopStep(Node):
         ],
         exec_res: InnerLoopStepResult,
     ):
-        shared["conversation_history"].append(
-            messages.AgentMessage(
-                personality_state=exec_res.personality_state,
-                emotions=exec_res.emotions,
-                thoughts=exec_res.thoughts,
-                message=exec_res.message,
-            )
+        shared["last_response"] = messages.AgentMessage(
+            personality_state=exec_res.personality_state,
+            emotions=exec_res.emotions,
+            thoughts=exec_res.thoughts,
+            message=exec_res.message,
         )
-        shared["response"] = exec_res.message
+        shared["conversation_history"].append(shared["last_response"])
+        shared["message"] = exec_res.message
 
 
 inner_loop_step_node = InnerLoopStep(max_retries=10)
@@ -90,7 +89,7 @@ class NewAuxiliaryMemoryDict(TypedDict):
     scratchpad: str
 
 
-class OuterLoopStepResult(BaseModel):
+class OuterLoopOptimiserStepResult(BaseModel):
     analysis: str
     mutable_personality_optimisation_planning: str
     new_mutable_personality: NewMutablePersonalityDict
@@ -98,7 +97,7 @@ class OuterLoopStepResult(BaseModel):
     new_auxiliary_memory: NewAuxiliaryMemoryDict
 
 
-class OuterLoopStep(Node):
+class OuterLoopOptimiserStep(Node):
     def prep(
         self, shared: Dict[str, Any]
     ) -> Tuple[memory.Memory, List[Union[messages.UserMessage, messages.AgentMessage]]]:
@@ -111,7 +110,7 @@ class OuterLoopStep(Node):
         prep_res: Tuple[
             memory.Memory, List[Union[messages.UserMessage, messages.AgentMessage]]
         ],
-    ) -> OuterLoopStepResult:
+    ) -> OuterLoopOptimiserStepResult:
         memory, conversation_history = prep_res
 
         resp = call_llm(
@@ -133,7 +132,7 @@ class OuterLoopStep(Node):
         )
 
         result = extract_yaml(resp)
-        result_validated = OuterLoopStepResult.model_validate(result)
+        result_validated = OuterLoopOptimiserStepResult.model_validate(result)
 
         return result_validated
 
@@ -143,7 +142,7 @@ class OuterLoopStep(Node):
         prep_res: Tuple[
             memory.Memory, List[Union[messages.UserMessage, messages.AgentMessage]]
         ],
-        exec_res: OuterLoopStepResult,
+        exec_res: OuterLoopOptimiserStepResult,
     ):
         memory, conversation_history = prep_res
 
@@ -171,7 +170,71 @@ class OuterLoopStep(Node):
         auxiliary_memory.scratchpad = new_auxiliary_memory["scratchpad"]
 
 
-outer_loop_step_node = OuterLoopStep(max_retries=10)
+outer_loop_optimiser_step_node = OuterLoopOptimiserStep(max_retries=10)
+
+
+class OuterLoopSummariserStepResult(BaseModel):
+    analysis: str
+    new_interaction_summary: str
+
+
+class OuterLoopSummariserStep(Node):
+    def prep(
+        self, shared: Dict[str, Any]
+    ) -> Tuple[memory.Memory, List[Union[messages.UserMessage, messages.AgentMessage]]]:
+        memory = shared["memory"]
+        conversation_history = shared["conversation_history"]
+        return memory, conversation_history
+
+    def exec(
+        self,
+        prep_res: Tuple[
+            memory.Memory, List[Union[messages.UserMessage, messages.AgentMessage]]
+        ],
+    ) -> OuterLoopSummariserStepResult:
+        memory, conversation_history = prep_res
+
+        resp = call_llm(
+            [
+                {
+                    "role": "system",
+                    "content": prompts.OUTER_LOOP_SUMMARISER_PROMPT.format(
+                        memory=memory
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": yaml.dump(
+                        [message.as_message_dict() for message in conversation_history],
+                        sort_keys=False,
+                    ),
+                },
+            ]
+        )
+
+        result = extract_yaml(resp)
+        result_validated = OuterLoopSummariserStepResult.model_validate(result)
+
+        return result_validated
+
+    def post(
+        self,
+        shared: Dict[str, Any],
+        prep_res: Tuple[
+            memory.Memory, List[Union[messages.UserMessage, messages.AgentMessage]]
+        ],
+        exec_res: OuterLoopSummariserStepResult,
+    ):
+        memory, conversation_history = prep_res
+
+        # *Update Interaction Summary
+        auxiliary_memory = memory.auxiliary_memory
+        new_interaction_summary = exec_res.new_interaction_summary
+
+        auxiliary_memory.interaction_summary = new_interaction_summary
+
+
+outer_loop_summariser_step_node = OuterLoopSummariserStep(max_retries=10)
 
 
 if __name__ == "__main__":
@@ -189,4 +252,4 @@ if __name__ == "__main__":
     }
     inner_loop_step_node.run(shared)
     print(f"Agent Message: {shared['response']}")
-    print(f"Full Agent Response:\n{shared['conversation_history'][-1]}")
+    print(f"Full Agent Response:\n{shared['last_response']}")
