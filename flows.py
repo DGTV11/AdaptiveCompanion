@@ -246,10 +246,10 @@ if __name__ == "__main__":
         "memory": memory.DEFAULT_MEMORY,
         "conversation_history": [
             messages.UserMessage(
-                message="(SYSTEM) User has entered the conversation for the first time"
+                message="(SYSTEM) User has entered the conversation for the first time. Suggestion: introduce yourself/get to know the user."
             )
         ],
     }
     inner_loop_step_node.run(shared)
-    print(f"Agent Message: {shared['response']}")
+    print(f"Agent Message: {shared['message']}")
     print(f"Full Agent Response:\n{shared['last_response']}")
