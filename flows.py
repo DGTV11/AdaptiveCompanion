@@ -1,3 +1,4 @@
+import time
 from dataclasses import fields
 from typing import Annotated, Any, Dict, List, Tuple, Union
 
@@ -39,7 +40,10 @@ class InnerLoopStep(Node):
             [
                 {
                     "role": "system",
-                    "content": prompts.INNER_LOOP_AGENT_PROMPT.format(memory=memory),
+                    "content": prompts.INNER_LOOP_AGENT_PROMPT.format(
+                        memory=memory,
+                        current_datetime=time.strftime("%H:%M%p %Z on %b %d, %Y"),
+                    ),
                 }
             ]
             + [message.as_std_message_format() for message in conversation_history]
@@ -118,7 +122,8 @@ class OuterLoopOptimiserStep(Node):
                 {
                     "role": "system",
                     "content": prompts.OUTER_LOOP_OPTIMISER_PROMPT.format(
-                        memory=memory
+                        memory=memory,
+                        current_datetime=time.strftime("%H:%M%p %Z on %b %d, %Y"),
                     ),
                 },
                 {
@@ -199,7 +204,8 @@ class OuterLoopSummariserStep(Node):
                 {
                     "role": "system",
                     "content": prompts.OUTER_LOOP_SUMMARISER_PROMPT.format(
-                        memory=memory
+                        memory=memory,
+                        current_datetime=time.strftime("%H:%M%p %Z on %b %d, %Y"),
                     ),
                 },
                 {
