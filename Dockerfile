@@ -1,0 +1,16 @@
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+# RUN apt-get update && apt-get install -y docker.io libmagic1
+RUN apt-get update && apt-get install -y socat
+
+ADD . /app
+
+WORKDIR /app
+
+ENV UV_HTTP_TIMEOUT=120
+
+RUN uv sync --locked # --compile-bytecode
+
+RUN chmod +x entrypoint.sh
+
+ENTRYPOINT ["./entrypoint.sh"]

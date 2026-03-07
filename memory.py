@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import NamedTuple, Optional, Tuple
+from uuid import UUID
 
+import db
 import prompts
 
 
@@ -73,6 +75,213 @@ class Memory:
             user_memory=self.auxiliary_memory.user_memory,
             scratchpad=self.auxiliary_memory.scratchpad,
             interaction_summary=self.auxiliary_memory.interaction_summary,
+        )
+
+    @classmethod
+    def read_from_db(cls, agent_id: UUID):
+        # *Read Core Personality
+        name, likes, dislikes, desires, mode_of_communication = db.read(
+            "SELECT name, likes, dislikes, desires, mode_of_communication FROM core_personality WHERE agent_id = %s",
+            (agent_id,),
+        )[0]
+
+        # *Read Mutable Personality
+        (
+            previous_humanlikeness,
+            previous_affection,
+            previous_warmth,
+            previous_enthusiasm,
+            previous_impulsiveness,
+            previous_curiosity,
+            previous_quirkiness,
+            previous_shyness,
+            previous_nerdiness,
+            previous_cuteness,
+        ) = db.read(
+            "SELECT humanlikeness, affection, warmth, enthusiasm, impulsiveness, curiosity, quirkiness, shyness, nerdiness, cuteness FROM previous_mutable_personality WHERE agent_id = %s",
+            (agent_id,),
+        )[
+            0
+        ]
+
+        (
+            current_humanlikeness,
+            current_affection,
+            current_warmth,
+            current_enthusiasm,
+            current_impulsiveness,
+            current_curiosity,
+            current_quirkiness,
+            current_shyness,
+            current_nerdiness,
+            current_cuteness,
+        ) = db.read(
+            "SELECT humanlikeness, affection, warmth, enthusiasm, impulsiveness, curiosity, quirkiness, shyness, nerdiness, cuteness FROM current_mutable_personality WHERE agent_id = %s",
+            (agent_id,),
+        )[
+            0
+        ]
+
+        # *Read Auxiliary Memory
+        user_memory, scratchpad, interaction_summary = db.read(
+            "SELECT user_memory, scratchpad, interaction_summary FROM auxiliary_memory WHERE agent_id = %s",
+            (agent_id,),
+        )[0]
+
+        return cls(
+            core_personality=CorePersonality(
+                name=name,
+                likes=likes,
+                dislikes=dislikes,
+                desires=desires,
+                mode_of_communication=mode_of_communication,
+            ),
+            mutable_personality=MutablePersonality(
+                humanlikeness=MutablePersonalityTrait(
+                    previous_value=previous_humanlikeness,
+                    current_value=current_humanlikeness,
+                ),
+                affection=MutablePersonalityTrait(
+                    previous_value=previous_affection, current_value=current_affection
+                ),
+                warmth=MutablePersonalityTrait(
+                    previous_value=previous_warmth, current_value=current_warmth
+                ),
+                enthusiasm=MutablePersonalityTrait(
+                    previous_value=previous_enthusiasm, current_value=current_enthusiasm
+                ),
+                impulsiveness=MutablePersonalityTrait(
+                    previous_value=previous_impulsiveness,
+                    current_value=current_impulsiveness,
+                ),
+                curiosity=MutablePersonalityTrait(
+                    previous_value=previous_curiosity, current_value=current_curiosity
+                ),
+                quirkiness=MutablePersonalityTrait(
+                    previous_value=previous_quirkiness, current_value=current_quirkiness
+                ),
+                shyness=MutablePersonalityTrait(
+                    previous_value=previous_shyness, current_value=current_shyness
+                ),
+                nerdiness=MutablePersonalityTrait(
+                    previous_value=previous_nerdiness, current_value=current_nerdiness
+                ),
+                cuteness=MutablePersonalityTrait(
+                    previous_value=previous_cuteness, current_value=current_cuteness
+                ),
+            ),
+            auxiliary_memory=AuxiliaryMemory(
+                user_memory=user_memory,
+                scratchpad=scratchpad,
+                interaction_summary=interaction_summary,
+            ),
+        )
+
+    def update_db(self, agent_id: UUID):
+        # *Update Mutable Personality
+        db.write(
+            "UPDATE previous_mutable_personality SET humanlikeness = %s, affection = %s, warmth = %s, enthusiasm = %s, impulsiveness = %s, curiosity = %s, quirkiness = %s, shyness = %s, nerdiness = %s, cuteness = %s WHERE agent_id = %s",
+            (
+                self.mutable_personality.humanlikeness.previous_value,
+                self.mutable_personality.affection.previous_value,
+                self.mutable_personality.warmth.previous_value,
+                self.mutable_personality.enthusiasm.previous_value,
+                self.mutable_personality.impulsiveness.previous_value,
+                self.mutable_personality.curiosity.previous_value,
+                self.mutable_personality.quirkiness.previous_value,
+                self.mutable_personality.shyness.previous_value,
+                self.mutable_personality.nerdiness.previous_value,
+                self.mutable_personality.cuteness.previous_value,
+                agent_id,
+            ),
+        )
+
+        db.write(
+            "UPDATE current_mutable_personality SET humanlikeness = %s, affection = %s, warmth = %s, enthusiasm = %s, impulsiveness = %s, curiosity = %s, quirkiness = %s, shyness = %s, nerdiness = %s, cuteness = %s WHERE agent_id = %s",
+            (
+                self.mutable_personality.humanlikeness.current_value,
+                self.mutable_personality.affection.current_value,
+                self.mutable_personality.warmth.current_value,
+                self.mutable_personality.enthusiasm.current_value,
+                self.mutable_personality.impulsiveness.current_value,
+                self.mutable_personality.curiosity.current_value,
+                self.mutable_personality.quirkiness.current_value,
+                self.mutable_personality.shyness.current_value,
+                self.mutable_personality.nerdiness.current_value,
+                self.mutable_personality.cuteness.current_value,
+                agent_id,
+            ),
+        )
+
+        # *Update Auxiliary Memory
+        db.write(
+            "UPDATE auxiliary_memory SET user_memory = %s, scratchpad = %s, interaction_summary = %s WHERE agent_id = %s",
+            (
+                self.auxiliary_memory.user_memory,
+                self.auxiliary_memory.scratchpad,
+                self.auxiliary_memory.interaction_summary,
+                agent_id,
+            ),
+        )
+
+    def insert_into_db(self, agent_id: UUID):
+        # *Write Core Personality
+        db.write(
+            "INSERT INTO core_personality (agent_id, name, likes, dislikes, desires, mode_of_communication) VALUES (%s, %s, %s, %s, %s, %s)",
+            (
+                agent_id,
+                self.core_personality.name,
+                self.core_personality.likes,
+                self.core_personality.dislikes,
+                self.core_personality.desires,
+                self.core_personality.mode_of_communication,
+            ),
+        )
+
+        # *Write Mutable Personality
+        db.write(
+            "INSERT INTO previous_mutable_personality (agent_id, humanlikeness, affection, warmth, enthusiasm, impulsiveness, curiosity, quirkiness, shyness, nerdiness, cuteness) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+                agent_id,
+                self.mutable_personality.humanlikeness.previous_value,
+                self.mutable_personality.affection.previous_value,
+                self.mutable_personality.warmth.previous_value,
+                self.mutable_personality.enthusiasm.previous_value,
+                self.mutable_personality.impulsiveness.previous_value,
+                self.mutable_personality.curiosity.previous_value,
+                self.mutable_personality.quirkiness.previous_value,
+                self.mutable_personality.shyness.previous_value,
+                self.mutable_personality.nerdiness.previous_value,
+                self.mutable_personality.cuteness.previous_value,
+            ),
+        )
+
+        db.write(
+            "INSERT INTO current_mutable_personality (agent_id, humanlikeness, affection, warmth, enthusiasm, impulsiveness, curiosity, quirkiness, shyness, nerdiness, cuteness) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+                agent_id,
+                self.mutable_personality.humanlikeness.current_value,
+                self.mutable_personality.affection.current_value,
+                self.mutable_personality.warmth.current_value,
+                self.mutable_personality.enthusiasm.current_value,
+                self.mutable_personality.impulsiveness.current_value,
+                self.mutable_personality.curiosity.current_value,
+                self.mutable_personality.quirkiness.current_value,
+                self.mutable_personality.shyness.current_value,
+                self.mutable_personality.nerdiness.current_value,
+                self.mutable_personality.cuteness.current_value,
+            ),
+        )
+
+        # *Write Auxiliary Memory
+        db.write(
+            "INSERT INTO auxiliary_memory (agent_id, user_memory, scratchpad, interaction_summary) VALUES (%s, %s, %s, %s)",
+            (
+                agent_id,
+                self.auxiliary_memory.user_memory,
+                self.auxiliary_memory.scratchpad,
+                self.auxiliary_memory.interaction_summary,
+            ),
         )
 
 

@@ -39,13 +39,11 @@ def call_llm(messages: List[Dict[str, str]]) -> str:
                 assert completion.choices[
                     0
                 ].message.content, "Empty completion from LLM"
-                # print(
-                #     f"Final response from LLM backend {name} model {model}", flush=True
-                # )
+                print(f"Using LLM backend {name} model {model}", flush=True)
                 return completion.choices[0].message.content
             except Exception as e:
                 errors.append(f"backend {name} model {model}: {e}")
-                print(f"LLM backend {name} model {model} failed: {e}", flush=True)
+                # print(f"LLM backend {name} model {model} failed: {e}", flush=True)
 
     raise RuntimeError(f"All LLM models failed:\n" + "\n".join(errors))
 
@@ -64,13 +62,11 @@ def call_vlm(messages: List[Dict[str, Union[str, Any]]]) -> str:
                 assert completion.choices[
                     0
                 ].message.content, "Empty completion from VLM"
-                # print(
-                #     f"Final response from VLM backend {name} model {model}", flush=True
-                # )
+                print(f"Using VLM backend {name} model {model}", flush=True)
                 return completion.choices[0].message.content
             except Exception as e:
                 errors.append(f"backend {name} model {model}: {e}")
-                print(f"VLM backend {name} model {model} failed: {e}", flush=True)
+                # print(f"VLM backend {name} model {model} failed: {e}", flush=True)
 
     raise RuntimeError(f"All VLM models failed:\n" + "\n".join(errors))
 
