@@ -3,7 +3,7 @@ from os import getenv
 import yaml
 
 OPTIMISER_FREQUENCY_IN_USER_MESSAGES = int(
-    getenv("OPTIMISER_FREQUENCY_IN_USER_MESSAGES") or "7"
+    getenv("OPTIMISER_FREQUENCY_IN_USER_MESSAGES") or "5"
 )
 
 POSTGRES_USER = str(getenv("POSTGRES_USER"))

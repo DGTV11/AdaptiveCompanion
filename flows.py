@@ -92,7 +92,9 @@ class NewAuxiliaryMemoryDict(TypedDict):
 
 class OuterLoopStepResult(BaseModel):
     analysis: str
+    mutable_personality_optimisation_planning: str
     new_mutable_personality: NewMutablePersonalityDict
+    auxiliary_memory_update_planning: str
     new_auxiliary_memory: NewAuxiliaryMemoryDict
 
 
