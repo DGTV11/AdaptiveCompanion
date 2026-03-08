@@ -30,13 +30,13 @@ Cuteness: {cuteness}
 
 ### Current Auxiliary Memory
 
-User memory (what you know/remember and feel about the user):
+User Memory (what you know/remember and feel about the user):
 {user_memory}
 
-Scratchpad (information you need to remember clearly across chats, if any):
+Scratchpad (information you need to remember clearly across chats, if any; do NOT specify fixed Core Personality trait levels as they are ADAPTIVE):
 {scratchpad}
 
-Interaction summary (summary of your chats with the user):
+Interaction Summary (summary of your chats with the user):
 {interaction_summary}
 """.strip()
 
