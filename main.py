@@ -97,7 +97,7 @@ def interact_with_agent(
                         % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES
                         == 0
                     ):
-                        user_message = f"(SYSTEM) Personality optimisations and auxiliary memory updates complete.\n\n{user_message}"
+                        user_message = f"(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.\n\n{user_message}"
 
                     run_inner_loop(
                         shared,
@@ -108,12 +108,15 @@ def interact_with_agent(
 
             user_message_count += 1
             if user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES == 0:
+                last_2_messages = shared["conversation_history"][-2:]
+                shared["conversation_history"] = shared["conversation_history"][:-2]
+                
                 run_outer_loop(shared, agent_id)
 
-                shared["conversation_history"] = shared["conversation_history"][-2:]
+                shared["conversation_history"] = last_2_messages
 
                 print(
-                    "(SYSTEM) Personality optimisations and auxiliary memory updates complete.",
+                    "(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.",
                     flush=True,
                 )
     except KeyboardInterrupt:
