@@ -1,4 +1,6 @@
-1) make FastAPI API
+1) Allow user to react to last agent message
+
+2) make FastAPI API
 (CRUD)
 - Create: duh
 - Delete: duh
@@ -13,12 +15,12 @@
   - GET /session/events
     - polls for proactive agent message during session due to inactivity/before session
 
-2) humanlikeness+impulsiveness+enthusiasm-shyness trait determines if agent start convo/agent proactive nudge
+3) make Textual (https://github.com/Textualize/textual) TUI/webpage n host 
+
+4) humanlikeness+impulsiveness+enthusiasm-shyness trait determines if agent start convo/agent proactive nudge
   - base probability
     - personality factor = clamp_0_1((impulsiveness/10)+(enthusiasm/40)-(shyness/20))
     - base proactive probability = (humanlikeness/10)*personality factor
-  - convo start probability = base proactive probability 
   - nudge during convo = base prob, with exponential backoff (time) increasing after sent proactive msg (base interval ~2min, backoff ~45s), resets when user replies
   - nudge during convo = base prob, with exponential backoff (time) increasing after sent proactive msg (much higher base interval eg 2h + backoff eg 30min)
 
-3) make Textual (https://github.com/Textualize/textual) TUI/webpage n host 
