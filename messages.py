@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import yaml
 
@@ -29,7 +29,8 @@ class AgentMessage:
     personality_state: str
     emotions: List[Tuple[str, int]]
     thoughts: List[str]
-    message: str
+    reaction_emoji: Optional[str]
+    messages: Optional[List[str]]
 
     def as_std_message_format(self) -> Dict[str, str]:
         return {
@@ -39,7 +40,8 @@ class AgentMessage:
                     "personality_state": self.personality_state,
                     "emotions": self.emotions,
                     "thoughts": self.thoughts,
-                    "message": self.message,
+                    "reaction_emoji": self.reaction_emoji,
+                    "messages": self.messages,
                 },
                 sort_keys=False,
             ),
@@ -52,7 +54,8 @@ class AgentMessage:
                 "personality_state": self.personality_state,
                 "emotions": self.emotions,
                 "thoughts": self.thoughts,
-                "message": self.message,
+                "reaction_emoji": self.reaction_emoji,
+                "messages": self.messages,
             },
         }
 

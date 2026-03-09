@@ -1,10 +1,11 @@
 import time
 from dataclasses import fields
-from typing import Annotated, Any, Dict, List, Tuple, Union
+from typing import Annotated, Any, Dict, List, Optional, Tuple, Union
 
 import yaml
+from emoji import is_emoji
 from pocketflow import Flow, Node
-from pydantic import BaseModel, conint
+from pydantic import BaseModel, conint, validator
 from typing_extensions import TypedDict
 
 import memory
@@ -17,7 +18,16 @@ class InnerLoopStepResult(BaseModel):
     personality_state: str
     emotions: List[Tuple[str, Annotated[int, conint(ge=1, le=10)]]]
     thoughts: List[str]
-    message: str
+    reaction_emoji: Optional[str]
+    messages: Optional[List[str]]
+
+    @validator("reaction_emoji")
+    def must_be_single_emoji(cls, v):
+        if v is None:
+            return v
+        if not is_emoji(v):
+            raise ValueError("reaction_emoji must be a single emoji character")
+        return v
 
 
 class InnerLoopStep(Node):
@@ -46,7 +56,7 @@ class InnerLoopStep(Node):
                     ),
                 }
             ]
-            + [message.as_std_message_format() for message in conversation_history]
+            + [turn.as_std_message_format() for turn in conversation_history]
         )
 
         result = extract_yaml(resp)
@@ -66,10 +76,12 @@ class InnerLoopStep(Node):
             personality_state=exec_res.personality_state,
             emotions=exec_res.emotions,
             thoughts=exec_res.thoughts,
-            message=exec_res.message,
+            reaction_emoji=exec_res.reaction_emoji,
+            messages=exec_res.messages,
         )
         shared["conversation_history"].append(shared["last_response"])
-        shared["message"] = exec_res.message
+        shared["reaction_emoji"] = exec_res.reaction_emoji
+        shared["messages"] = exec_res.messages
 
 
 inner_loop_step_node = InnerLoopStep(max_retries=10)
@@ -129,7 +141,7 @@ class OuterLoopOptimiserStep(Node):
                 {
                     "role": "user",
                     "content": yaml.dump(
-                        [message.as_message_dict() for message in conversation_history],
+                        [turn.as_message_dict() for turn in conversation_history],
                         sort_keys=False,
                     ),
                 },
@@ -211,7 +223,7 @@ class OuterLoopSummariserStep(Node):
                 {
                     "role": "user",
                     "content": yaml.dump(
-                        [message.as_message_dict() for message in conversation_history],
+                        [turn.as_message_dict() for turn in conversation_history],
                         sort_keys=False,
                     ),
                 },
@@ -257,5 +269,5 @@ if __name__ == "__main__":
         ],
     }
     inner_loop_step_node.run(shared)
-    print(f"Agent Message: {shared['message']}")
+    print(f"Agent Messages: {shared['messages']}")
     print(f"Full Agent Response:\n{shared['last_response']}")

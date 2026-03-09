@@ -54,27 +54,37 @@ def interact_with_agent(
         agent_id,
         first_message,
     )
-    print(f"{agent_name}: {shared['message']}", end="\n\n", flush=True)
+    if shared["messages"]:
+        for message in shared["messages"]:
+            print(f"{agent_name}: {message}", end="\n\n", flush=True)
 
     user_message = ""
     user_message_count = 0
     try:
         while user_message != "quit":
-            print('You (enter "/quit" to quit, "/help" for help): ', end="", flush=True)
+            print(
+                'You (enter "/quit" or "/exit" to quit, "/help" for help): ',
+                end="",
+                flush=True,
+            )
             user_message = input().strip()
+            print(flush=True)
 
             match user_message:
                 case "":
                     continue
                 case "/quit":
                     break
+                case "/exit":
+                    break
                 case "/help":
                     print(
                         """
     /help - display this help message
     /quit - quit
+    /exit - exit
     /memory - display agent memory view
-    /last_response - display last agent full response
+    /last-response - display last agent full response
                     """,
                         end="\n\n",
                         flush=True,
@@ -83,7 +93,7 @@ def interact_with_agent(
                 case "/memory":
                     print(repr(shared["memory"]), end="\n\n", flush=True)
                     continue
-                case "/last_response":
+                case "/last-response":
                     if len(shared["conversation_history"]) == 0:
                         print("No last agent full response", flush=True)
                     else:
@@ -104,13 +114,21 @@ def interact_with_agent(
                         agent_id,
                         user_message,
                     )
-                    print(f"{agent_name}: {shared['message']}", end="\n\n", flush=True)
+                    if shared["reaction_emoji"]:
+                        print(
+                            f"{agent_name} reacted {shared["reaction_emoji"]} to your message",
+                            flush=True,
+                        )
+
+                    if shared["messages"]:
+                        for message in shared["messages"]:
+                            print(f"{agent_name}: {message}", end="\n\n", flush=True)
 
             user_message_count += 1
             if user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES == 0:
                 last_2_messages = shared["conversation_history"][-2:]
                 shared["conversation_history"] = shared["conversation_history"][:-2]
-                
+
                 run_outer_loop(shared, agent_id)
 
                 shared["conversation_history"] = last_2_messages
@@ -134,13 +152,13 @@ def interact_with_agent(
 
 if __name__ == "__main__":
     print(
-        """
- █████╗ ██████╗  █████╗ ██████╗ ████████╗██╗██╗   ██╗███████╗ ██████╗ ██████╗ ███╗   ███╗██████╗  █████╗ ███╗   ██╗██╗ ██████╗ ███╗   ██╗
-██╔══██╗██╔══██╗██╔══██╗██╔══██╗╚══██╔══╝██║██║   ██║██╔════╝██╔════╝██╔═══██╗████╗ ████║██╔══██╗██╔══██╗████╗  ██║██║██╔═══██╗████╗  ██║
-███████║██║  ██║███████║██████╔╝   ██║   ██║██║   ██║█████╗  ██║     ██║   ██║██╔████╔██║██████╔╝███████║██╔██╗ ██║██║██║   ██║██╔██╗ ██║
-██╔══██║██║  ██║██╔══██║██╔═══╝    ██║   ██║╚██╗ ██╔╝██╔══╝  ██║     ██║   ██║██║╚██╔╝██║██╔═══╝ ██╔══██║██║╚██╗██║██║██║   ██║██║╚██╗██║
-██║  ██║██████╔╝██║  ██║██║        ██║   ██║ ╚████╔╝ ███████╗╚██████╗╚██████╔╝██║ ╚═╝ ██║██║     ██║  ██║██║ ╚████║██║╚██████╔╝██║ ╚████║
-╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝        ╚═╝   ╚═╝  ╚═══╝  ╚══════╝ ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝
+        r"""
+    ___       __            __  _            ______                                  _           
+   /   | ____/ /___ _____  / /_(_)   _____  / ____/___  ____ ___  ____  ____ _____  (_)___  ____ 
+  / /| |/ __  / __ `/ __ \/ __/ / | / / _ \/ /   / __ \/ __ `__ \/ __ \/ __ `/ __ \/ / __ \/ __ \
+ / ___ / /_/ / /_/ / /_/ / /_/ /| |/ /  __/ /___/ /_/ / / / / / / /_/ / /_/ / / / / / /_/ / / / /
+/_/  |_\__,_/\__,_/ .___/\__/_/ |___/\___/\____/\____/_/ /_/ /_/ .___/\__,_/_/ /_/_/\____/_/ /_/ 
+                 /_/                                          /_/                                
 
     """,
         flush=True,
