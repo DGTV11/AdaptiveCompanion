@@ -126,12 +126,14 @@ def interact_with_agent(
 
             user_message_count += 1
             if user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES == 0:
-                last_2_messages = shared["conversation_history"][-2:]
-                shared["conversation_history"] = shared["conversation_history"][:-2]
+                last_3_user_agent_turns = shared["conversation_history"][-(3 * 2) :]
+                shared["conversation_history"] = shared["conversation_history"][
+                    : -(3 * 2)
+                ]
 
                 run_outer_loop(shared, agent_id)
 
-                shared["conversation_history"] = last_2_messages
+                shared["conversation_history"] = last_3_user_agent_turns
 
                 print(
                     "(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.",
