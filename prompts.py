@@ -144,9 +144,9 @@ auxiliary_memory_update_planning: |
     detailed step-by-step analysis and planning of how your auxiliary memory should be updated, if necessary, based on collected user preferences/behaviours/interests/communication patterns/tone, as well as feelings toward the user and current bond state
 new_auxiliary_memory:
     user_memory: |
-        new user memory (ONE string, needs to incorporate/add new information+feelings/delete irrelevant or outdated information+feelings you have about the user into the previous user_memory, should be in your personality's voice, may remain unchanged IF AND ONLY IF no change deemed necessary)
+        new user memory (ONE string, needs to incorporate/add new information+feelings/delete irrelevant or outdated information+feelings you have about the user into the previous user_memory, keep CONCISE, should be in your personality's voice, may remain unchanged IF AND ONLY IF no change deemed necessary)
     scratchpad: |
-        new scratchpad memory (ONE string, you may add new information you wish to remember clearly/delete irrelevant or outdated information, should be in your personality's voice, may remain unchanged IF AND ONLY IF no change deemed necessary)
+        new scratchpad memory (ONE string, you may add new information you wish to remember clearly e.g. but not limited texting style or miscellaneous conversational details/delete irrelevant or outdated information, keep CONCISE, should be in your personality's voice, may remain unchanged IF AND ONLY IF no change deemed necessary)
 ```
 
 ## Current datetime
