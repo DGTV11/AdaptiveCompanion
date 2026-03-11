@@ -14,5 +14,7 @@ dependencies = [
     "psycopg[binary]>=3.3.3",
     "pydantic>=2.12.5",
     "pyyaml>=6.0.3",
+    "textual>=8.1.1",
+    "textual-dev>=1.8.0",
     "types-pyyaml>=6.0.12.20250915",
 ]
