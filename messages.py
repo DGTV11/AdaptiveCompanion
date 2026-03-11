@@ -38,7 +38,7 @@ class AgentMessage:
             "content": yaml.dump(
                 {
                     "personality_state": self.personality_state,
-                    "emotions": self.emotions,
+                    "emotions": [list(emotion_tuple) for emotion_tuple in self.emotions],
                     "thoughts": self.thoughts,
                     "reaction_emoji": self.reaction_emoji,
                     "messages": self.messages,
@@ -52,7 +52,7 @@ class AgentMessage:
             "role": "user",
             "content": {
                 "personality_state": self.personality_state,
-                "emotions": self.emotions,
+                "emotions": [list(emotion_tuple) for emotion_tuple in self.emotions],
                 "thoughts": self.thoughts,
                 "reaction_emoji": self.reaction_emoji,
                 "messages": self.messages,
