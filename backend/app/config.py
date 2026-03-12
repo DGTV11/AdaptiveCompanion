@@ -1,4 +1,4 @@
-from os import getenv
+from os import getenv, path
 
 import yaml
 
@@ -16,6 +16,8 @@ POSTGRES_URL = (
 )
 POSTGRES_SQLACADEMY_URL = f"postgresql+psycopg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@postgres:5464/{POSTGRES_DB}"
 
+# backends_config_path = path.join(path.dirname(path.dirname(__file__)), "backends.yaml")
+# with open(backends_config_path, "r") as f:
 with open("backends.yaml", "r") as f:
     backends_config = yaml.safe_load(f)
     LLM_CONFIG = backends_config["llm_backends"]

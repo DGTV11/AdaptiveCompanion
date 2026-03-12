@@ -24,8 +24,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-  adaptivecompanion:
-    build: .
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     # develop:
       # watch:
         # - action: rebuild
