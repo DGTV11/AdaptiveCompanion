@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import NamedTuple, Optional, Tuple
+from typing import Any, Dict, NamedTuple, Optional, Tuple
 from uuid import UUID
 
 import db
@@ -76,6 +76,46 @@ class Memory:
             scratchpad=self.auxiliary_memory.scratchpad,
             interaction_summary=self.auxiliary_memory.interaction_summary,
         )
+
+    def as_dict(self) -> Dict[str, Dict[str, Any]]:
+        return {
+            "core_personality": {
+                "name": self.core_personality.name,
+                "likes": self.core_personality.likes,
+                "dislikes": self.core_personality.dislikes,
+                "desires": self.core_personality.desires,
+                "mode_of_communication": self.core_personality.mode_of_communication,
+            },
+            "previous_mutable_personality": {
+                "humanlikeness": self.mutable_personality.humanlikeness.previous_value,
+                "affection": self.mutable_personality.affection.previous_value,
+                "warmth": self.mutable_personality.warmth.previous_value,
+                "enthusiasm": self.mutable_personality.enthusiasm.previous_value,
+                "impulsiveness": self.mutable_personality.impulsiveness.previous_value,
+                "curiosity": self.mutable_personality.curiosity.previous_value,
+                "quirkiness": self.mutable_personality.quirkiness.previous_value,
+                "shyness": self.mutable_personality.shyness.previous_value,
+                "nerdiness": self.mutable_personality.nerdiness.previous_value,
+                "cuteness": self.mutable_personality.cuteness.previous_value,
+            },
+            "current_mutable_personality": {
+                "humanlikeness": self.mutable_personality.humanlikeness.current_value,
+                "affection": self.mutable_personality.affection.current_value,
+                "warmth": self.mutable_personality.warmth.current_value,
+                "enthusiasm": self.mutable_personality.enthusiasm.current_value,
+                "impulsiveness": self.mutable_personality.impulsiveness.current_value,
+                "curiosity": self.mutable_personality.curiosity.current_value,
+                "quirkiness": self.mutable_personality.quirkiness.current_value,
+                "shyness": self.mutable_personality.shyness.current_value,
+                "nerdiness": self.mutable_personality.nerdiness.current_value,
+                "cuteness": self.mutable_personality.cuteness.current_value,
+            },
+            "auxiliary_memory": {
+                "user_memory": self.auxiliary_memory.user_memory,
+                "scratchpad": self.auxiliary_memory.scratchpad,
+                "interaction_summary": self.auxiliary_memory.interaction_summary,
+            },
+        }
 
     @classmethod
     def read_from_db(cls, agent_id: UUID):

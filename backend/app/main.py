@@ -1,14 +1,21 @@
-from datetime import datetime
-from typing import Any, Dict, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Annotated, Any, Dict, List, Optional
 from uuid import UUID, uuid4
-
-from humanize import precisedelta
 
 import config
 import db
 import flows
+import jwt
 import memory
 import messages
+from fastapi import Depends, FastAPI, Form, HTTPException, status
+from fastapi.responses import ORJSONResponse
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from humanize import precisedelta
+from jwt.exceptions import InvalidTokenError
+from password_strength import PasswordPolicy
+from pwdlib import PasswordHash
+from pydantic import BaseModel, field_validator
 
 
 def run_inner_loop(shared: Dict[str, Any], agent_id: UUID, user_message: str):
@@ -150,6 +157,294 @@ def interact_with_agent(
         "(SYSTEM) Personality optimisations and auxiliary memory updates complete.",
         flush=True,
     )
+
+
+# *Models
+
+
+# **Auth
+
+password_policy = PasswordPolicy.from_names(strength=0.66)
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: str | None = None
+
+
+class User(BaseModel):
+    id: UUID
+    created_at: datetime
+    username: str
+
+
+class UserInDB(User):
+    hashed_password: str
+
+
+class UserCreateFormData(BaseModel):
+    username: str
+    password: str
+    confirm_password: str
+
+    @field_validator("confirm_password")
+    def passwords_match(cls, v, info):
+        if "password" in info.data and v != info.data["password"]:
+            raise ValueError("Passwords do not match")
+        return v
+
+    @field_validator("confirm_password")
+    def password_is_strong(cls, v, info):
+        if len(password_policy.test()) > 0:
+            raise ValueError("Passwords not strong enough")
+        return v
+
+
+# **Agents
+
+
+class AgentInfo(BaseModel):
+    id: UUID
+    name: str
+    created_at: datetime
+    last_user_message_time: datetime
+
+
+# *API
+
+password_hash = PasswordHash.recommended()
+
+DUMMY_HASH = password_hash.hash("dummypassword")
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+app = FastAPI(default_response_class=ORJSONResponse)
+
+
+def verify_password(plain_password, hashed_password):
+    return password_hash.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password):
+    return password_hash.hash(password)
+
+
+def get_user(username: str):
+    matched_users = db.read(
+        "SELECT * FROM users WHERE username = %s",
+        (username,),
+    )
+
+    if matched_users:
+        id, created_at, username, hashed_password = matched_users[0]
+        return UserInDB(
+            id=id,
+            created_at=created_at,
+            username=username,
+            hashed_password=hashed_password,
+        )
+
+
+def authenticate_user(username: str, password: str):
+    user = get_user(username)
+
+    if not user:
+        verify_password(password, DUMMY_HASH)  # *prevent timing attacks
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
+
+    return user
+
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, config.SECRET_KEY, algorithm=config.ALGORITHM)
+    return encoded_jwt
+
+
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, config.SECRET_KEY, algorithms=[config.ALGORITHM])
+        username = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+        if token_data.username is None:
+            raise credentials_exception
+    except InvalidTokenError:
+        raise credentials_exception
+    user = get_user(username=token_data.username)
+    if user is None:
+        raise credentials_exception
+    return user
+
+
+@app.post("/token")
+async def login_for_access_token(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+) -> Token:
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return Token(access_token=access_token, token_type="bearer")
+
+
+@app.post("/users", status_code=201)
+async def new_user(form_data: Annotated[UserCreateFormData, Form()]):
+    username_exists = bool(
+        len(
+            db.read(
+                "SELECT users.id FROM users WHERE users.username = %s",
+                (form_data.username,),
+            )
+        )
+    )
+
+    if username_exists:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username already exists",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if (
+        db.read(
+            "SELECT COUNT(*) FROM users",
+        )[
+            0
+        ][0]
+        >= config.MAX_USERS
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User limit reached",
+            headers={"WWW-Authenticate": "Bearer"},
+        )  # TODO: future me problem: fix potential race condition using locking
+
+    hashed_password = get_password_hash(form_data.password)
+
+    db.write(
+        "INSERT INTO users (username, hashed_password) VALUES (%s, %s)",
+        (form_data.username, hashed_password),
+    )
+
+
+@app.get("/users/me")
+async def read_users_me(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    return current_user
+
+
+@app.delete("/users/me")
+async def delete_users_me(
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    db.write(
+        "DELETE FROM users WHERE id = %s",
+        (current_user.id,),
+    )
+
+
+@app.get("/agents")
+async def list_agents(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> List[AgentInfo]:
+    return [
+        AgentInfo(**{k: v for k, v in zip(AgentInfo.model_fields.keys(), agent_info)})
+        for agent_info in db.read(
+            """
+SELECT agents.id, core_personality.name, agents.created_at, agents.last_user_message_time FROM agents WHERE agents.user_id = %s
+INNER JOIN core_personality ON agents.id = core_personality.agent_id
+    """,
+            (current_user.id,),
+        )
+    ]
+
+
+@app.get("/agent/{agent_id}")
+async def get_agent(
+    agent_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    agent_exists = bool(
+        len(
+            db.read(
+                "SELECT agents.id FROM agents WHERE agents.user_id = %s AND agents.id = %s",
+                (current_user.id, agent_id),
+            )
+        )
+    )
+
+    if agent_exists:
+        return memory.Memory.read_from_db(agent_id).as_dict()
+
+
+@app.delete("/agent/{agent_id}")
+async def delete_agent(
+    agent_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    db.write(
+        "DELETE FROM agents WHERE agents.user_id = %s AND agents.id = %s",
+        (current_user.id, agent_id),
+    )
+
+
+@app.post("/agents/default", status_code=201)
+def create_agent_with_default_personality(
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    agent_id = uuid4()
+
+    memory_data = memory.DEFAULT_MEMORY
+
+    db.write(
+        "INSERT INTO agents (id, user_id) VALUES (%s, %s)", (agent_id, current_user.id)
+    )
+    memory_data.insert_into_db(agent_id)
+
+
+@app.post("/agents/custom", status_code=201)
+def create_agent_with_custom_personality(
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    agent_id = uuid4()
+
+    memory_data = (
+        memory.Memory()
+    )  # TODO: make memory from pydantic form model (borrow from outer loop flow validators)
+
+    db.write(
+        "INSERT INTO agents (id, user_id) VALUES (%s, %s)", (agent_id, current_user.id)
+    )
+    memory_data.insert_into_db(agent_id)
+
+
+# TODO: make chat session/event-based SSE system
 
 
 if __name__ == "__main__":

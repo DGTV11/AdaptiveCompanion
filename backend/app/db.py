@@ -4,31 +4,27 @@ from typing import Any, List, Optional, Tuple, Union
 # import chromadb
 import orjson
 import psycopg
-from psycopg.types.json import set_json_dumps, set_json_loads
-
 from config import POSTGRES_URL
+from psycopg.types.json import set_json_dumps, set_json_loads
+from psycopg_pool import ConnectionPool
+
+pool = ConnectionPool(POSTGRES_URL)
 
 
 # *Helper functions
 def write(query: str, values: Optional[Tuple[Any, ...]] = None) -> None:
-    with psycopg.connect(POSTGRES_URL) as conn:
+    with pool.connection() as conn:
         with conn.cursor() as cur:
-            if values:
-                cur.execute(query, values)
-            else:
-                cur.execute(query)
-            conn.commit()
+            cur.execute(query, values)
+        conn.commit()
 
 
 def read(
     query: str, values: Optional[Tuple[Any, ...]] = None
 ) -> List[Tuple[Any, ...]]:  # values can be tuple
-    with psycopg.connect(POSTGRES_URL) as conn:
+    with pool.connection() as conn:
         with conn.cursor() as cur:
-            if values:
-                cur.execute(query, values)
-            else:
-                cur.execute(query)
+            cur.execute(query, values)
             return cur.fetchall()
 
 
@@ -54,13 +50,27 @@ write(
     'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
 )
 
+## *Users
+write(
+    """
+    CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        username TEXT NOT NULL,
+        hashed_password TEXT NOT NULL
+    );
+    """,
+)
+
 ## *Agents
 write(
     """
     CREATE TABLE IF NOT EXISTS agents (
         id UUID PRIMARY KEY NOT NULL,
+        user_id UUID NOT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        last_user_message_time TIMESTAMP DEFAULT NULL
+        last_user_message_time TIMESTAMP DEFAULT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
     """,
 )

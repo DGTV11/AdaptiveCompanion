@@ -1,17 +1,16 @@
 import time
 from dataclasses import fields
-from typing import Annotated, Any, Dict, List, Optional, Tuple, Union
-
-import yaml
-from emoji import is_emoji
-from pocketflow import Flow, Node
-from pydantic import BaseModel, conint, validator
-from typing_extensions import TypedDict
+from typing import Annotated, Any, Dict, List, Optional, Tuple, Union, cast
 
 import memory
 import messages
 import prompts
+import yaml
+from emoji import is_emoji
 from llm import call_llm, extract_yaml
+from pocketflow import Flow, Node
+from pydantic import BaseModel, conint, validator
+from typing_extensions import TypedDict
 
 
 class InnerLoopStepResult(BaseModel):
@@ -164,7 +163,7 @@ class OuterLoopOptimiserStep(Node):
         memory, conversation_history = prep_res
 
         # *Update Mutable Personality
-        new_mutable_personality = exec_res.new_mutable_personality
+        new_mutable_personality = cast(dict[str, Any], exec_res.new_mutable_personality)
         mutable_personality = memory.mutable_personality
 
         for trait_field in fields(mutable_personality):

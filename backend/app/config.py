@@ -2,6 +2,11 @@ from os import getenv, path
 
 import yaml
 
+SECRET_KEY = str(getenv("SECRET_KEY"))
+ALGORITHM = str(getenv("ALGORITHM") or "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(getenv("ACCESS_TOKEN_EXPIRE_MINUTES") or "75")
+MAX_USERS = int(getenv("MAX_USERS") or "1")
+
 OPTIMISER_FREQUENCY_IN_USER_MESSAGES = int(
     getenv("OPTIMISER_FREQUENCY_IN_USER_MESSAGES") or "5"
 )
