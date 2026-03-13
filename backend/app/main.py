@@ -16,12 +16,14 @@ from jwt.exceptions import InvalidTokenError
 from password_strength import PasswordPolicy
 from pwdlib import PasswordHash
 from pydantic import BaseModel, field_validator
+from typing_extensions import TypedDict
 
 
 def run_inner_loop(shared: Dict[str, Any], agent_id: UUID, user_message: str):
     shared["conversation_history"].append(
         messages.UserMessage(
             message=user_message,
+            reaction_emoji=None,
             timestamp=datetime.now(),
         ),
     )
@@ -215,6 +217,32 @@ class AgentInfo(BaseModel):
     name: str
     created_at: datetime
     last_user_message_time: datetime
+
+
+class CorePersonalityDict(TypedDict):
+    name: str
+    likes: str
+    dislikes: str
+    desires: str
+    mode_of_communication: str
+
+
+class MutablePersonalityDict(TypedDict):
+    humanlikeness: Annotated[int, conint(ge=0, le=10)]
+    affection: Annotated[int, conint(ge=0, le=10)]
+    warmth: Annotated[int, conint(ge=0, le=10)]
+    enthusiasm: Annotated[int, conint(ge=0, le=10)]
+    impulsiveness: Annotated[int, conint(ge=0, le=10)]
+    curiosity: Annotated[int, conint(ge=0, le=10)]
+    quirkiness: Annotated[int, conint(ge=0, le=10)]
+    shyness: Annotated[int, conint(ge=0, le=10)]
+    nerdiness: Annotated[int, conint(ge=0, le=10)]
+    cuteness: Annotated[int, conint(ge=0, le=10)]
+
+
+class CustomPersonalityFormData(BaseModel):
+    core_personality: CorePersonalityDict
+    mutable_personality: MutablePersonalityDict
 
 
 # *API
@@ -434,13 +462,66 @@ def create_agent_with_default_personality(
 @app.post("/agents/custom", status_code=201)
 def create_agent_with_custom_personality(
     current_user: Annotated[User, Depends(get_current_user)],
+    form_data: Annotated[CustomPersonalityFormData, Form()],
 ):
     agent_id = uuid4()
 
-    memory_data = (
-        memory.Memory()
-    )  # TODO: make memory from pydantic form model (borrow from outer loop flow validators)
-
+    memory_data = memory.Memory(
+        core_personality=memory.CorePersonality(
+            name=form_data.core_personality["name"],
+            likes=form_data.core_personality["likes"],
+            dislikes=form_data.core_personality["dislikes"],
+            desires=form_data.core_personality["desires"],
+            mode_of_communication=form_data.core_personality["mode_of_communication"],
+        ),
+        mutable_personality=memory.MutablePersonality(
+            humanlikeness=memory.MutablePersonalityTrait(
+                previous_value=None,
+                current_value=form_data.mutable_personality["humanlikeness"],
+            ),
+            affection=memory.MutablePersonalityTrait(
+                previous_value=None,
+                current_value=form_data.mutable_personality["affection"],
+            ),
+            warmth=memory.MutablePersonalityTrait(
+                previous_value=None,
+                current_value=form_data.mutable_personality["warmth"],
+            ),
+            enthusiasm=memory.MutablePersonalityTrait(
+                previous_value=None,
+                current_value=form_data.mutable_personality["enthusiasm"],
+            ),
+            impulsiveness=memory.MutablePersonalityTrait(
+                previous_value=None,
+                current_value=form_data.mutable_personality["impulsiveness"],
+            ),
+            curiosity=memory.MutablePersonalityTrait(
+                previous_value=None,
+                current_value=form_data.mutable_personality["curiosity"],
+            ),
+            quirkiness=memory.MutablePersonalityTrait(
+                previous_value=None,
+                current_value=form_data.mutable_personality["quirkiness"],
+            ),
+            shyness=memory.MutablePersonalityTrait(
+                previous_value=None,
+                current_value=form_data.mutable_personality["shyness"],
+            ),
+            nerdiness=memory.MutablePersonalityTrait(
+                previous_value=None,
+                current_value=form_data.mutable_personality["nerdiness"],
+            ),
+            cuteness=memory.MutablePersonalityTrait(
+                previous_value=None,
+                current_value=form_data.mutable_personality["cuteness"],
+            ),
+        ),
+        auxiliary_memory=memory.AuxiliaryMemory(
+            user_memory="Nothing yet",
+            scratchpad="Nothing yet",
+            interaction_summary="Nothing yet",
+        ),
+    )
     db.write(
         "INSERT INTO agents (id, user_id) VALUES (%s, %s)", (agent_id, current_user.id)
     )

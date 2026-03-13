@@ -249,22 +249,3 @@ class OuterLoopSummariserStep(Node):
 
 
 outer_loop_summariser_step_node = OuterLoopSummariserStep(max_retries=10)
-
-
-if __name__ == "__main__":
-    print("THIS IS A TEST FOR flows.py (inner loop)")
-
-    assert input("DO YOU WISH TO PROCEED? (y/n) ").strip() == "y", "abort"
-
-    shared = {
-        "memory": memory.DEFAULT_MEMORY,
-        "conversation_history": [
-            messages.UserMessage(
-                message="(SYSTEM) User has entered the conversation for the first time. Suggestion: introduce yourself/get to know the user.",
-                timestamp=datetime.now(),
-            )
-        ],
-    }
-    inner_loop_step_node.run(shared)
-    print(f"Agent Messages: {shared['messages']}")
-    print(f"Full Agent Response:\n{shared['last_response']}")
