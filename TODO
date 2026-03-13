@@ -1,12 +1,10 @@
-1) Allow user to react to last agent message
-
-2) make FastAPI API
-(CRUD)
+1) make FastAPI API
 - [ ] add semaphores to lock sending message/quitting session/deleting agent per session
+- [ ] fix smelly race condition in user creation
 
-3) make Textual (https://github.com/Textualize/textual) TUI/webpage n host 
+2) make Textual (https://github.com/Textualize/textual) TUI/webpage n host 
 
-4) humanlikeness+impulsiveness+enthusiasm-shyness trait determines if agent start convo/agent proactive nudge
+3) humanlikeness+impulsiveness+enthusiasm-shyness trait determines if agent start convo/agent proactive nudge
   - base probability
     - personality factor = clamp_0_1((impulsiveness/10)+(enthusiasm/40)-(shyness/20))
     - base proactive probability = (humanlikeness/10)*personality factor

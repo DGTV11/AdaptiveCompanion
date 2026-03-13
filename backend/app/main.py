@@ -1,4 +1,5 @@
 from asyncio import Queue
+from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any, Dict, List, Literal, Optional, TypedDict, Union
@@ -14,6 +15,7 @@ from emoji import is_emoji
 from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, status
 from fastapi.responses import ORJSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.sse import EventSourceResponse
 from humanize import precisedelta
 from jwt.exceptions import InvalidTokenError
 from password_strength import PasswordPolicy
@@ -144,7 +146,13 @@ from pydantic import BaseModel, Field, RootModel, field_validator, validator
 
 # **Auth
 
-password_policy = PasswordPolicy.from_names(strength=0.66)
+password_policy = policy = PasswordPolicy.from_names(
+    length=8,
+    uppercase=1,
+    numbers=1,
+    special=1,
+    nonletters=1,
+)
 
 
 class Token(BaseModel):
@@ -179,8 +187,18 @@ class UserCreateFormData(BaseModel):
 
     @field_validator("confirm_password")
     def password_is_strong(cls, v, info):
-        if len(password_policy.test()) > 0:
-            raise ValueError("Passwords not strong enough")
+        password_strength_errors = password_policy.test(v)
+        if len(password_strength_errors) > 0:
+            unmet_requirements = ", ".join(
+                [
+                    f"{type(error).__name__} >= {error.args[0]}"
+                    for error in password_strength_errors
+                ]
+            )
+
+            raise ValueError(
+                f"Password not strong enough (unmet requirements: {unmet_requirements})"
+            )
         return v
 
 
@@ -220,6 +238,29 @@ class CustomPersonalityFormData(BaseModel):
     mutable_personality: MutablePersonalityDict
 
 
+# **Events
+
+
+class AgentMessageEvent(BaseModel):
+    event_type: Literal["agent"] = "agent"
+    message: messages.AgentMessage
+
+
+class SystemEvent(BaseModel):
+    event_type: Literal["system"] = "system"
+    message: str
+
+
+class ExitEvent(BaseModel):
+    event_type: Literal["exit"] = "exit"
+
+
+class Event(RootModel):
+    root: Union[AgentMessageEvent, SystemEvent, ExitEvent] = Field(
+        discriminator="event_type"
+    )
+
+
 # **Sessions
 
 
@@ -234,7 +275,7 @@ class SessionRuntime:
     agent_name: str
     user_message_count: int
     shared: Dict[str, Any]
-    event_queue: Queue
+    event_queue: Queue[Event]
 
 
 sessions_by_user: Dict[UUID, Dict[UUID, SessionRuntime]] = dict()
@@ -252,23 +293,6 @@ class UserMessageFormData(BaseModel):
         if not is_emoji(v):
             raise ValueError("reaction_emoji must be a single emoji character")
         return v
-
-
-# **Events
-
-
-class AgentMessageEvent(BaseModel):
-    event_type: Literal["agent"] = "agent"
-    message: messages.AgentMessage
-
-
-class SystemEvent(BaseModel):
-    event_type: Literal["system"] = "system"
-    message: str
-
-
-class Event(RootModel):
-    root: Union[AgentMessageEvent, SystemEvent] = Field(discriminator="event_type")
 
 
 # *API
@@ -724,10 +748,14 @@ async def delete_session(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    runtime = sessions_by_user[current_user.id][agent_id]
+
     run_outer_loop(
-        runtime=sessions_by_user[current_user.id][agent_id],
+        runtime=runtime,
         agent_id=agent_id,
     )
+
+    await runtime.event_queue.put(Event(ExitEvent()))
 
     del sessions_by_user[current_user.id][agent_id]
 
@@ -758,7 +786,31 @@ async def send_message(
     )
 
 
-# TODO: make chat session/event-based SSE system
+@app.get("/sessions/{agent_id}/events")
+async def stream_session_events(
+    agent_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> AsyncIterable[Event]:
+    if not (
+        current_user.id in sessions_by_user
+        and agent_id in sessions_by_user[current_user.id]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session does not exist",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    event_queue = sessions_by_user[current_user.id][agent_id].event_queue
+    while True:
+        event = await event_queue.get()
+        yield event
+        event_queue.task_done()
+        if event.root.event_type == "exit":
+            break
+
+
+# TODO: add semaphores
 
 
 # if __name__ == "__main__":
