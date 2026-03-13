@@ -7,15 +7,15 @@ import yaml
 
 @dataclass
 class UserMessage:
-    message: str
-    reaction_emoji: Optional[str]
     timestamp: datetime
+    reaction_emoji: Optional[str]
+    message: str
 
     def as_dict(self) -> Dict[str, Any]:
         return {
-            "message": self.message,
-            "reaction_emoji": self.reaction_emoji,
             "timestamp": self.timestamp,
+            "reaction_emoji": self.reaction_emoji,
+            "message": self.message,
         }
 
     def as_std_message_format(self) -> Dict[str, str]:

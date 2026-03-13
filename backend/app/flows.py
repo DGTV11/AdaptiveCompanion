@@ -1,6 +1,6 @@
 from dataclasses import fields
 from datetime import datetime
-from typing import Annotated, Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Annotated, Any, Dict, List, Optional, Tuple, TypedDict, Union, cast
 
 import memory
 import messages
@@ -10,7 +10,6 @@ from emoji import is_emoji
 from llm import call_llm, extract_yaml
 from pocketflow import Flow, Node
 from pydantic import BaseModel, conint, validator
-from typing_extensions import TypedDict
 
 
 class InnerLoopStepResult(BaseModel):
@@ -78,8 +77,6 @@ class InnerLoopStep(Node):
             messages=exec_res.messages,
         )
         shared["conversation_history"].append(shared["last_response"])
-        shared["reaction_emoji"] = exec_res.reaction_emoji
-        shared["messages"] = exec_res.messages
 
 
 inner_loop_step_node = InnerLoopStep(max_retries=10)

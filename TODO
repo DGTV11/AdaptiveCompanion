@@ -2,16 +2,7 @@
 
 2) make FastAPI API
 (CRUD)
-- [ ] Create: create agents
-- Update: chat loop
-  - [ ] POST /session/start
-    - sid
-  - [ ] POST /session/send-message
-    - send message, status code 202
-  - [ ] GET /session/events (SSE endpoint)
-    - sid, message_queue
-    - get agent response + if outer loop ran (if N messages, optimiser+summariser runs right after inner loop)
-    - polls for proactive agent message during session due to inactivity/before session
+- [ ] add semaphores to lock sending message/quitting session/deleting agent per session
 
 3) make Textual (https://github.com/Textualize/textual) TUI/webpage n host 
 
