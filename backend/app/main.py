@@ -20,7 +20,7 @@ from humanize import precisedelta
 from jwt.exceptions import InvalidTokenError
 from password_strength import PasswordPolicy
 from pwdlib import PasswordHash
-from pydantic import BaseModel, Field, RootModel, field_validator, validator
+from pydantic import BaseModel, Field, RootModel, conint, field_validator, validator
 
 # def interact_with_agent(
 #     agent_id: UUID, last_user_message_time: Optional[datetime], agent_name: str
