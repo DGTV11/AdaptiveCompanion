@@ -103,10 +103,6 @@ properties:
       type: string
       description: "A single message to the user"
 ```
-
-## Current datetime
-
-{current_datetime}
 """.strip()
 
 OUTER_LOOP_OPTIMISER_PROMPT = """
@@ -148,10 +144,6 @@ new_auxiliary_memory:
     scratchpad: |
         new scratchpad memory (ONE string, you may add new information you wish to remember clearly e.g. but not limited texting style or miscellaneous conversational details/delete irrelevant or outdated information, keep CONCISE, should be in your personality's voice, may remain unchanged IF AND ONLY IF no change deemed necessary)
 ```
-
-## Current datetime
-
-{current_datetime}
 """.strip()
 
 OUTER_LOOP_SUMMARISER_PROMPT = """
@@ -173,8 +165,4 @@ analysis: |
 new_interaction_summary: |
     summary of your interactions with the user (you as first person, user as third person), incorporating previous interaction summary and given conversation history in as few words as possible while still including all relevant information (ONE string, should be in your personality's voice, should allow you to answer questions about the given conversation history purely using the summary)
 ```
-
-## Current datetime
-
-{current_datetime}
 """.strip()

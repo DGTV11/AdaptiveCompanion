@@ -1,5 +1,5 @@
-import time
 from dataclasses import fields
+from datetime import datetime
 from typing import Annotated, Any, Dict, List, Optional, Tuple, Union, cast
 
 import memory
@@ -51,7 +51,6 @@ class InnerLoopStep(Node):
                     "role": "system",
                     "content": prompts.INNER_LOOP_AGENT_PROMPT.format(
                         memory=memory,
-                        current_datetime=time.strftime("%H:%M%p %Z on %b %d, %Y"),
                     ),
                 }
             ]
@@ -134,7 +133,6 @@ class OuterLoopOptimiserStep(Node):
                     "role": "system",
                     "content": prompts.OUTER_LOOP_OPTIMISER_PROMPT.format(
                         memory=memory,
-                        current_datetime=time.strftime("%H:%M%p %Z on %b %d, %Y"),
                     ),
                 },
                 {
@@ -216,7 +214,6 @@ class OuterLoopSummariserStep(Node):
                     "role": "system",
                     "content": prompts.OUTER_LOOP_SUMMARISER_PROMPT.format(
                         memory=memory,
-                        current_datetime=time.strftime("%H:%M%p %Z on %b %d, %Y"),
                     ),
                 },
                 {
@@ -263,7 +260,8 @@ if __name__ == "__main__":
         "memory": memory.DEFAULT_MEMORY,
         "conversation_history": [
             messages.UserMessage(
-                message="(SYSTEM) User has entered the conversation for the first time. Suggestion: introduce yourself/get to know the user."
+                message="(SYSTEM) User has entered the conversation for the first time. Suggestion: introduce yourself/get to know the user.",
+                timestamp=datetime.now(),
             )
         ],
     }

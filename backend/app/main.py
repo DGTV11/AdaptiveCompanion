@@ -20,7 +20,10 @@ from pydantic import BaseModel, field_validator
 
 def run_inner_loop(shared: Dict[str, Any], agent_id: UUID, user_message: str):
     shared["conversation_history"].append(
-        messages.UserMessage(message=user_message),
+        messages.UserMessage(
+            message=user_message,
+            timestamp=datetime.now(),
+        ),
     )
     flows.inner_loop_step_node.run(shared)
 
