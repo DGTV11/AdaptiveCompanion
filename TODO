@@ -1,14 +1,11 @@
-1) make FastAPI API
-- [ ] add semaphores to lock sending message/quitting session/deleting agent per session
-- [ ] fix smelly race condition in user creation
+1) make Textual (https://github.com/Textualize/textual) TUI/webpage n host 
 
-2) make Textual (https://github.com/Textualize/textual) TUI/webpage n host 
-
-3) humanlikeness+impulsiveness+enthusiasm-shyness trait determines if agent start convo/agent proactive nudge
+2) humanlikeness+impulsiveness+enthusiasm-shyness trait determines if agent proactive nudge
   - base probability
     - personality factor = clamp_0_1((impulsiveness/10)+(enthusiasm/40)-(shyness/20))
     - base proactive probability = (humanlikeness/10)*personality factor
   - nudge during convo = base prob, with exponential backoff (time) increasing after sent proactive msg (base interval ~2min, backoff ~45s), resets when user replies
   - nudge during convo = base prob, with exponential backoff (time) increasing after sent proactive msg (much higher base interval eg 2h + backoff eg 30min)
 
-remember: uv run mypy  --python-executable python backend/app/main.py
+remember: 
+uv run mypy  --python-executable python backend/app/main.py

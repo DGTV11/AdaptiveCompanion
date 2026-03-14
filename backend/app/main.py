@@ -1,6 +1,6 @@
-from asyncio import Queue
+from asyncio import Lock, Queue
 from collections.abc import AsyncIterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any, Dict, List, Literal, Optional, TypedDict, Union
 from uuid import UUID, uuid4
@@ -15,131 +15,12 @@ from emoji import is_emoji
 from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, status
 from fastapi.responses import ORJSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.sse import EventSourceResponse
+from fastapi.sse import EventSourceResponse, ServerSentEvent
 from humanize import precisedelta
 from jwt.exceptions import InvalidTokenError
 from password_strength import PasswordPolicy
 from pwdlib import PasswordHash
 from pydantic import BaseModel, Field, RootModel, conint, field_validator, validator
-
-# def interact_with_agent(
-#     agent_id: UUID, last_user_message_time: Optional[datetime], agent_name: str
-# ):
-#     print("Generating first agent message...", flush=True)
-#     shared = {
-#         "memory": memory.Memory.read_from_db(agent_id),
-#         "conversation_history": [],
-#     }
-#
-#     first_message = (
-#         "(SYSTEM) User has entered the conversation for the first time. Suggestion: introduce yourself/get to know the user."
-#         if not last_user_message_time
-#         else f"(SYSTEM) User has reentered the conversation (last user message {precisedelta(datetime.now() - last_user_message_time, minimum_unit='minutes')} ago)."
-#     )
-#     print(first_message, flush=True)
-#
-#     run_inner_loop(
-#         shared,
-#         agent_id,
-#         first_message,
-#     )
-#     if shared["messages"]:
-#         for message in shared["messages"]:
-#             print(f"{agent_name}: {message}", end="\n\n", flush=True)
-#
-#     user_message = ""
-#     user_message_count = 0
-#     try:
-#         while user_message != "quit":
-#             print(
-#                 'You (enter "/quit" or "/exit" to quit, "/help" for help): ',
-#                 end="",
-#                 flush=True,
-#             )
-#             user_message = input().strip()
-#             print(flush=True)
-#
-#             match user_message:
-#                 case "":
-#                     continue
-#                 case "/quit":
-#                     break
-#                 case "/exit":
-#                     break
-#                 case "/help":
-#                     print(
-#                         """
-#     /help - display this help message
-#     /quit - quit
-#     /exit - exit
-#     /memory - display agent memory view
-#     /last-response - display last agent full response
-#                     """,
-#                         end="\n\n",
-#                         flush=True,
-#                     )
-#                     continue
-#                 case "/memory":
-#                     print(repr(shared["memory"]), end="\n\n", flush=True)
-#                     continue
-#                 case "/last-response":
-#                     if len(shared["conversation_history"]) == 0:
-#                         print("No last agent full response", flush=True)
-#                     else:
-#                         print(shared["last_response"], flush=True)
-#                     continue
-#                 case _:
-#                     user_message = f"(USER) {user_message}"
-#                     if (
-#                         user_message_count > 0
-#                         and user_message_count
-#                         % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES
-#                         == 0
-#                     ):
-#                         user_message = f"(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.\n\n{user_message}"
-#
-#                     run_inner_loop(
-#                         shared,
-#                         agent_id,
-#                         user_message,
-#                     )
-#                     if shared["reaction_emoji"]:
-#                         print(
-#                             f"{agent_name} reacted {shared["reaction_emoji"]} to your message",
-#                             flush=True,
-#                         )
-#
-#                     if shared["messages"]:
-#                         for message in shared["messages"]:
-#                             print(f"{agent_name}: {message}", end="\n\n", flush=True)
-#
-#             user_message_count += 1
-#             if user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES == 0:
-#                 last_3_user_agent_turns = shared["conversation_history"][-(3 * 2) :]
-#                 shared["conversation_history"] = shared["conversation_history"][
-#                     : -(3 * 2)
-#                 ]
-#
-#                 run_outer_loop(shared, agent_id)
-#
-#                 shared["conversation_history"] = last_3_user_agent_turns
-#
-#                 print(
-#                     "(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.",
-#                     flush=True,
-#                 )
-#     except KeyboardInterrupt:
-#         pass
-#
-#     print("Exiting...", flush=True)
-#
-#     run_outer_loop(shared, agent_id)
-#
-#     print(
-#         "(SYSTEM) Personality optimisations and auxiliary memory updates complete.",
-#         flush=True,
-#     )
-
 
 # *Models/Dataclasses
 
@@ -209,7 +90,7 @@ class AgentInfo(BaseModel):
     id: UUID
     name: str
     created_at: datetime
-    last_user_message_time: datetime
+    last_user_message_time: Optional[datetime]
 
 
 class CorePersonalityDict(TypedDict):
@@ -264,6 +145,10 @@ class Event(RootModel):
 # **Sessions
 
 
+class SessionCreateFormData(BaseModel):
+    agent_id: UUID
+
+
 class SessionInfo(BaseModel):
     agent_id: UUID
     agent_name: str
@@ -275,7 +160,9 @@ class SessionRuntime:
     agent_name: str
     user_message_count: int
     shared: Dict[str, Any]
-    event_queue: Queue[Event]
+    event_queue: Queue[Event] = field(default_factory=Queue)
+    lock: Lock = field(default_factory=Lock)
+    exited: bool = False
 
 
 sessions_by_user: Dict[UUID, Dict[UUID, SessionRuntime]] = dict()
@@ -393,6 +280,9 @@ async def login_for_access_token(
     return Token(access_token=access_token, token_type="bearer")
 
 
+new_user_lock = Lock()
+
+
 @app.post("/users")
 async def new_user(form_data: Annotated[UserCreateFormData, Form()]):
     username_exists = bool(
@@ -411,26 +301,27 @@ async def new_user(form_data: Annotated[UserCreateFormData, Form()]):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if (
-        db.read(
-            "SELECT COUNT(*) FROM users",
-        )[
-            0
-        ][0]
-        >= config.MAX_USERS
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User limit reached",
-            headers={"WWW-Authenticate": "Bearer"},
-        )  # TODO: future me problem: fix potential race condition using locking
+    async with new_user_lock:
+        if (
+            db.read(
+                "SELECT COUNT(*) FROM users",
+            )[
+                0
+            ][0]
+            >= config.MAX_USERS
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User limit reached",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
-    hashed_password = get_password_hash(form_data.password)
+        hashed_password = get_password_hash(form_data.password)
 
-    db.write(
-        "INSERT INTO users (username, hashed_password) VALUES (%s, %s)",
-        (form_data.username, hashed_password),
-    )
+        db.write(
+            "INSERT INTO users (username, hashed_password) VALUES (%s, %s)",
+            (form_data.username, hashed_password),
+        )
 
 
 @app.get("/users/me")
@@ -444,6 +335,13 @@ async def read_users_me(
 async def delete_users_me(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
+    if sessions_by_user.get(current_user.id, None):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User has active sessions",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     db.write(
         "DELETE FROM users WHERE id = %s",
         (current_user.id,),
@@ -458,8 +356,9 @@ async def list_agents(
         AgentInfo(**{k: v for k, v in zip(AgentInfo.model_fields.keys(), agent_info)})
         for agent_info in db.read(
             """
-SELECT agents.id, core_personality.name, agents.created_at, agents.last_user_message_time FROM agents WHERE agents.user_id = %s
+SELECT agents.id, core_personality.name, agents.created_at, agents.last_user_message_time FROM agents
 INNER JOIN core_personality ON agents.id = core_personality.agent_id
+WHERE agents.user_id = %s
     """,
             (current_user.id,),
         )
@@ -504,23 +403,32 @@ async def delete_agent(
         )
     )
 
-    if agent_exists:
-        db.write(
-            "DELETE FROM agents WHERE agents.user_id = %s AND agents.id = %s",
-            (current_user.id, agent_id),
+    if not agent_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agent not found",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Agent not found",
-        headers={"WWW-Authenticate": "Bearer"},
+    if sessions_by_user.get(current_user.id, None) and sessions_by_user[
+        current_user.id
+    ].get(agent_id, None):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Agent has active session",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    db.write(
+        "DELETE FROM agents WHERE agents.user_id = %s AND agents.id = %s",
+        (current_user.id, agent_id),
     )
 
 
 @app.post("/agents/default", status_code=201)
 async def create_agent_with_default_personality(
     current_user: Annotated[User, Depends(get_current_user)],
-):
+) -> UUID:
     agent_id = uuid4()
 
     memory_data = memory.DEFAULT_MEMORY
@@ -530,12 +438,14 @@ async def create_agent_with_default_personality(
     )
     memory_data.insert_into_db(agent_id)
 
+    return agent_id
+
 
 @app.post("/agents/custom")
 async def create_agent_with_custom_personality(
     form_data: Annotated[CustomPersonalityFormData, Form()],
     current_user: Annotated[User, Depends(get_current_user)],
-):
+) -> UUID:
     agent_id = uuid4()
 
     memory_data = memory.Memory(
@@ -599,15 +509,21 @@ async def create_agent_with_custom_personality(
     )
     memory_data.insert_into_db(agent_id)
 
+    return agent_id
+
 
 @app.get("/sessions")
 async def list_sessions(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> List[SessionInfo]:
-    return [
-        SessionInfo(agent_id=session.agent_id, agent_name=session.agent_name)
-        for session in sessions_by_user[current_user.id].values()
-    ]
+    return (
+        []
+        if not sessions_by_user.get(current_user.id, None)
+        else [
+            SessionInfo(agent_id=session.agent_id, agent_name=session.agent_name)
+            for session in sessions_by_user[current_user.id].values()
+        ]
+    )
 
 
 def run_outer_loop(runtime: SessionRuntime, agent_id: UUID):
@@ -623,66 +539,75 @@ async def run_inner_loop(
     user_message: str,
     reaction_emoji: Optional[str],
 ):
-    user_message = f"(USER) {user_message}"
-    if (
-        runtime.user_message_count > 0
-        and runtime.user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES
-        == 0
-    ):
-        user_message = f"(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.\n\n{user_message}"
+    async with runtime.lock:
+        if runtime.event_queue.qsize() > 0 and runtime.exited:
+            return
 
-    runtime.shared["conversation_history"].append(
-        messages.UserMessage(
-            timestamp=datetime.now(),
-            reaction_emoji=reaction_emoji,
-            message=user_message,
-        ),
-    )
+        user_message = f"(USER) {user_message}"
+        if (
+            runtime.user_message_count > 0
+            and runtime.user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES
+            == 0
+        ):
+            user_message = f"(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.\n\n{user_message}"
 
-    db.write(
-        "UPDATE agents SET last_user_message_time = %s WHERE id = %s",
-        (
-            datetime.now(),
-            agent_id,
-        ),
-    )
-
-    flows.inner_loop_step_node.run(runtime.shared)
-
-    await runtime.event_queue.put(
-        Event(AgentMessageEvent(message=runtime.shared["last_response"]))
-    )
-
-    runtime.user_message_count += 1
-
-    if runtime.user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES == 0:
-        last_3_user_agent_turns = runtime.shared["conversation_history"][-(3 * 2) :]
-        runtime.shared["conversation_history"] = runtime.shared["conversation_history"][
-            : -(3 * 2)
-        ]
-
-        run_outer_loop(runtime, agent_id)
-
-        runtime.shared["conversation_history"] = last_3_user_agent_turns
-
-        await runtime.event_queue.put(
-            Event(
-                SystemEvent(
-                    message="(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.",
-                )
-            )
+        runtime.shared["conversation_history"].append(
+            messages.UserMessage(
+                timestamp=datetime.now(),
+                reaction_emoji=reaction_emoji,
+                message=user_message,
+            ),
         )
 
+        if runtime.user_message_count >= 0:
+            db.write(
+                "UPDATE agents SET last_user_message_time = %s WHERE id = %s",
+                (
+                    datetime.now(),
+                    agent_id,
+                ),
+            )
 
-@app.post("/sessions/{agent_id}")
+        flows.inner_loop_step_node.run(runtime.shared)
+
+        await runtime.event_queue.put(
+            Event(AgentMessageEvent(message=runtime.shared["last_response"]))
+        )
+
+        runtime.user_message_count += 1
+
+        if (
+            runtime.user_message_count > 0
+            and runtime.user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES
+            == 0
+        ):
+            last_3_user_agent_turns = runtime.shared["conversation_history"][-(3 * 2) :]
+            runtime.shared["conversation_history"] = runtime.shared[
+                "conversation_history"
+            ][: -(3 * 2)]
+
+            run_outer_loop(runtime, agent_id)
+
+            runtime.shared["conversation_history"] = last_3_user_agent_turns
+
+            await runtime.event_queue.put(
+                Event(
+                    SystemEvent(
+                        message="(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.",
+                    )
+                )
+            )
+
+
+@app.post("/sessions")
 async def new_session(
-    agent_id: UUID,
+    form_data: Annotated[SessionCreateFormData, Form()],
     background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     if (
         current_user.id in sessions_by_user
-        and agent_id in sessions_by_user[current_user.id]
+        and form_data.agent_id in sessions_by_user[current_user.id]
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -691,8 +616,12 @@ async def new_session(
         )
 
     matched_agents = db.read(
-        "SELECT agents.agent_name, agents.last_user_message_time FROM agents WHERE agents.user_id = %s AND agents.id = %s",
-        (current_user.id, agent_id),
+        """
+SELECT core_personality.name, agents.last_user_message_time FROM agents 
+INNER JOIN core_personality ON agents.id = core_personality.agent_id
+WHERE agents.user_id = %s AND agents.id = %s
+""",
+        (current_user.id, form_data.agent_id),
     )
 
     if len(matched_agents) == 0:
@@ -707,15 +636,14 @@ async def new_session(
     if current_user.id not in sessions_by_user:
         sessions_by_user[current_user.id] = {}
 
-    sessions_by_user[current_user.id][agent_id] = SessionRuntime(
-        agent_id=agent_id,
+    sessions_by_user[current_user.id][form_data.agent_id] = SessionRuntime(
+        agent_id=form_data.agent_id,
         agent_name=agent_name,
-        user_message_count=0,
+        user_message_count=-1,
         shared={
-            "memory": memory.Memory.read_from_db(agent_id),
+            "memory": memory.Memory.read_from_db(form_data.agent_id),
             "conversation_history": [],
         },
-        event_queue=Queue(),
     )
 
     first_message = (
@@ -726,16 +654,33 @@ async def new_session(
 
     background_tasks.add_task(
         run_inner_loop,
-        runtime=sessions_by_user[current_user.id][agent_id],
-        agent_id=agent_id,
+        runtime=sessions_by_user[current_user.id][form_data.agent_id],
+        agent_id=form_data.agent_id,
         user_message=first_message,
         reaction_emoji=None,
     )
 
 
+async def cleanup_session(runtime: SessionRuntime, agent_id: UUID, user_id: UUID):
+    async with runtime.lock:
+        if runtime.event_queue.qsize() > 0 and runtime.exited:
+            return
+
+        run_outer_loop(
+            runtime=runtime,
+            agent_id=agent_id,
+        )
+
+        await runtime.event_queue.put(Event(ExitEvent()))
+        runtime.exited = True
+
+        del sessions_by_user[user_id][agent_id]
+
+
 @app.delete("/sessions/{agent_id}")
 async def delete_session(
     agent_id: UUID,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     if not (
@@ -748,16 +693,12 @@ async def delete_session(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    runtime = sessions_by_user[current_user.id][agent_id]
-
-    run_outer_loop(
-        runtime=runtime,
+    background_tasks.add_task(
+        cleanup_session,
+        runtime=sessions_by_user[current_user.id][agent_id],
         agent_id=agent_id,
+        user_id=current_user.id,
     )
-
-    await runtime.event_queue.put(Event(ExitEvent()))
-
-    del sessions_by_user[current_user.id][agent_id]
 
 
 @app.post("/sessions/{agent_id}/message")
@@ -786,31 +727,26 @@ async def send_message(
     )
 
 
-@app.get("/sessions/{agent_id}/events")
+@app.get("/sessions/{agent_id}/events", response_class=EventSourceResponse)
 async def stream_session_events(
     agent_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-) -> AsyncIterable[Event]:
+) -> AsyncIterable[ServerSentEvent]:
     if not (
         current_user.id in sessions_by_user
         and agent_id in sessions_by_user[current_user.id]
     ):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session does not exist",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        yield ServerSentEvent(event="error", data="Session does not exist")
+        return
 
     event_queue = sessions_by_user[current_user.id][agent_id].event_queue
+
     while True:
         event = await event_queue.get()
-        yield event
+        yield ServerSentEvent(event="event", data=event)
         event_queue.task_done()
         if event.root.event_type == "exit":
-            break
-
-
-# TODO: add semaphores
+            return
 
 
 # if __name__ == "__main__":
