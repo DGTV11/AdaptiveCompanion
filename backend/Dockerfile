@@ -13,7 +13,7 @@ RUN uv sync --locked # --compile-bytecode
 
 ADD backend/app/ .
 
-EXPOSE 5555
+EXPOSE 5556
 
 # CMD ["socat","TCP-LISTEN:5555,reuseaddr,fork","EXEC:uv run main.py,stderr"]
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5555"]
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5556"]

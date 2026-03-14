@@ -13,14 +13,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports: 
-      - "5464:5464"
+      - "5554:5554"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    command: -p 5464
+    command: -p 5554
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -p 5464"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -p 5554"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -41,7 +41,7 @@ services:
       - ./backends.yaml:/app/backends.yaml
       - /var/run/docker.sock:/var/run/docker.sock
     ports: 
-      - "5555:5555"
+      - "5556:5556"
     env_file:
       - .env
 volumes:

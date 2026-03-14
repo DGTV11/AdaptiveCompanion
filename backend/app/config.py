@@ -17,9 +17,9 @@ POSTGRES_PASSWORD = str(getenv("POSTGRES_PASSWORD"))
 POSTGRES_DB = str(getenv("POSTGRES_DB"))
 
 POSTGRES_URL = (
-    f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@postgres:5464/{POSTGRES_DB}"
+    f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@postgres:5554/{POSTGRES_DB}"
 )
-POSTGRES_SQLACADEMY_URL = f"postgresql+psycopg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@postgres:5464/{POSTGRES_DB}"
+POSTGRES_SQLACADEMY_URL = f"postgresql+psycopg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@postgres:5554/{POSTGRES_DB}"
 
 # backends_config_path = path.join(path.dirname(path.dirname(__file__)), "backends.yaml")
 # with open(backends_config_path, "r") as f:
