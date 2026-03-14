@@ -28,20 +28,28 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    # develop:
-      # watch:
-        # - action: rebuild
-        #   path: ./pyproject.toml
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      # - .:/app
-      # - /app/.venv
       - ./backends.yaml:/app/backends.yaml
-      - /var/run/docker.sock:/var/run/docker.sock
+    # - /var/run/docker.sock:/var/run/docker.sock
     ports: 
       - "5556:5556"
+    env_file:
+      - .env
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backends.yaml:/app/backends.yaml
+    # - /var/run/docker.sock:/var/run/docker.sock
+    ports: 
+      - "5555:5555"
     env_file:
       - .env
 volumes:
