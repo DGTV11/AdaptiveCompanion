@@ -590,6 +590,7 @@ async def run_inner_loop(
         )
 
         runtime.user_message_count += 1
+        runtime.user_reaction_emoji = None
 
         if (
             runtime.user_message_count > 0
