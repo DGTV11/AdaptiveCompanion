@@ -162,6 +162,7 @@ class SessionRuntime:
     shared: Dict[str, Any]
     event_queue: Queue[Event] = field(default_factory=Queue)
     lock: Lock = field(default_factory=Lock)
+    user_reaction_emoji: Optional[str] = None
     exited: bool = False
 
 
@@ -169,17 +170,20 @@ sessions_by_user: Dict[UUID, Dict[UUID, SessionRuntime]] = dict()
 
 
 # **Message sending
-class UserMessageFormData(BaseModel):
+class UserReactionEmojiFormData(BaseModel):
     reaction_emoji: Optional[str]
-    message: str
 
     @validator("reaction_emoji")
     def must_be_single_emoji(cls, v):
-        if v is None:
-            return v
+        if v in (None, ""):
+            return None
         if not is_emoji(v):
             raise ValueError("reaction_emoji must be a single emoji character")
         return v
+
+
+class UserMessageFormData(BaseModel):
+    message: str
 
 
 # *API
@@ -526,6 +530,18 @@ async def list_sessions(
     )
 
 
+async def update_reaction_emoji_in_runtime(
+    runtime: SessionRuntime,
+    agent_id: UUID,
+    reaction_emoji: Optional[str],
+):
+    async with runtime.lock:
+        if runtime.event_queue.qsize() > 0 and runtime.exited:
+            return
+
+        runtime.user_reaction_emoji = reaction_emoji
+
+
 def run_outer_loop(runtime: SessionRuntime, agent_id: UUID):
     flows.outer_loop_optimiser_step_node.run(runtime.shared)
     flows.outer_loop_summariser_step_node.run(runtime.shared)
@@ -537,7 +553,6 @@ async def run_inner_loop(
     runtime: SessionRuntime,
     agent_id: UUID,
     user_message: str,
-    reaction_emoji: Optional[str],
 ):
     async with runtime.lock:
         if runtime.event_queue.qsize() > 0 and runtime.exited:
@@ -554,7 +569,7 @@ async def run_inner_loop(
         runtime.shared["conversation_history"].append(
             messages.UserMessage(
                 timestamp=datetime.now(),
-                reaction_emoji=reaction_emoji,
+                reaction_emoji=runtime.user_reaction_emoji,
                 message=user_message,
             ),
         )
@@ -657,7 +672,6 @@ WHERE agents.user_id = %s AND agents.id = %s
         runtime=sessions_by_user[current_user.id][form_data.agent_id],
         agent_id=form_data.agent_id,
         user_message=first_message,
-        reaction_emoji=None,
     )
 
 
@@ -701,6 +715,31 @@ async def delete_session(
     )
 
 
+@app.post("/sessions/{agent_id}/reaction-emoji")
+async def update_reaction_emoji(
+    agent_id: UUID,
+    form_data: Annotated[UserReactionEmojiFormData, Form()],
+    background_tasks: BackgroundTasks,
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    if not (
+        current_user.id in sessions_by_user
+        and agent_id in sessions_by_user[current_user.id]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session does not exist",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    background_tasks.add_task(
+        update_reaction_emoji_in_runtime,
+        runtime=sessions_by_user[current_user.id][agent_id],
+        agent_id=agent_id,
+        reaction_emoji=form_data.reaction_emoji,
+    )
+
+
 @app.post("/sessions/{agent_id}/message")
 async def send_message(
     agent_id: UUID,
@@ -723,7 +762,6 @@ async def send_message(
         runtime=sessions_by_user[current_user.id][agent_id],
         agent_id=agent_id,
         user_message=form_data.message,
-        reaction_emoji=form_data.reaction_emoji,
     )
 
 
