@@ -1,0 +1,30 @@
+LoginScreen {
+    align: center middle;
+}
+
+.form {
+    grid-size: 1 4;
+    grid-gutter: 1 2;
+    grid-rows: 1fr 1fr 1fr 1fr;
+    padding: 0 1;
+    width: 60;
+    height: 20;
+    border: thick $background 80%;
+    background: $surface;
+}
+
+.form-title {
+    height: auto;
+    width: 1fr;
+    content-align: center middle;
+}
+
+.form-field {
+    grid-rows: auto 1fr;
+    align: center middle;
+}
+
+.submit-btn {
+    width: 100%;
+    column-span: 2;
+}
