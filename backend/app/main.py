@@ -1,3 +1,4 @@
+import traceback
 from asyncio import Lock, Queue
 from collections.abc import AsyncIterable
 from dataclasses import dataclass, field
@@ -132,12 +133,17 @@ class SystemEvent(BaseModel):
     message: str
 
 
+class ErrorEvent(BaseModel):
+    event_type: Literal["error"] = "error"
+    message: str
+
+
 class ExitEvent(BaseModel):
     event_type: Literal["exit"] = "exit"
 
 
 class Event(RootModel):
-    root: Union[AgentMessageEvent, SystemEvent, ExitEvent] = Field(
+    root: Union[AgentMessageEvent, SystemEvent, ErrorEvent, ExitEvent] = Field(
         discriminator="event_type"
     )
 
@@ -558,58 +564,71 @@ async def run_inner_loop(
         if runtime.event_queue.qsize() > 0 and runtime.exited:
             return
 
-        user_message = f"(USER) {user_message}"
-        if (
-            runtime.user_message_count > 0
-            and runtime.user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES
-            == 0
-        ):
-            user_message = f"(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.\n\n{user_message}"
+        try:
+            user_message = f"(USER) {user_message}"
+            if (
+                runtime.user_message_count > 0
+                and runtime.user_message_count
+                % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES
+                == 0
+            ):
+                user_message = f"(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.\n\n{user_message}"
 
-        runtime.shared["conversation_history"].append(
-            messages.UserMessage(
-                timestamp=datetime.now(),
-                reaction_emoji=runtime.user_reaction_emoji,
-                message=user_message,
-            ),
-        )
-
-        if runtime.user_message_count >= 0:
-            db.write(
-                "UPDATE agents SET last_user_message_time = %s WHERE id = %s",
-                (
-                    datetime.now(),
-                    agent_id,
+            runtime.shared["conversation_history"].append(
+                messages.UserMessage(
+                    timestamp=datetime.now(),
+                    reaction_emoji=runtime.user_reaction_emoji,
+                    message=user_message,
                 ),
             )
 
-        flows.inner_loop_step_node.run(runtime.shared)
+            if runtime.user_message_count >= 0:
+                db.write(
+                    "UPDATE agents SET last_user_message_time = %s WHERE id = %s",
+                    (
+                        datetime.now(),
+                        agent_id,
+                    ),
+                )
 
-        await runtime.event_queue.put(
-            Event(AgentMessageEvent(message=runtime.shared["last_response"]))
-        )
-
-        runtime.user_message_count += 1
-        runtime.user_reaction_emoji = None
-
-        if (
-            runtime.user_message_count > 0
-            and runtime.user_message_count % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES
-            == 0
-        ):
-            last_3_user_agent_turns = runtime.shared["conversation_history"][-(3 * 2) :]
-            runtime.shared["conversation_history"] = runtime.shared[
-                "conversation_history"
-            ][: -(3 * 2)]
-
-            run_outer_loop(runtime, agent_id)
-
-            runtime.shared["conversation_history"] = last_3_user_agent_turns
+            flows.inner_loop_step_node.run(runtime.shared)
 
             await runtime.event_queue.put(
+                Event(AgentMessageEvent(message=runtime.shared["last_response"]))
+            )
+
+            runtime.user_message_count += 1
+            runtime.user_reaction_emoji = None
+
+            if (
+                runtime.user_message_count > 0
+                and runtime.user_message_count
+                % config.OPTIMISER_FREQUENCY_IN_USER_MESSAGES
+                == 0
+            ):
+                last_3_user_agent_turns = runtime.shared["conversation_history"][
+                    -(3 * 2) :
+                ]
+                runtime.shared["conversation_history"] = runtime.shared[
+                    "conversation_history"
+                ][: -(3 * 2)]
+
+                run_outer_loop(runtime, agent_id)
+
+                runtime.shared["conversation_history"] = last_3_user_agent_turns
+
+                await runtime.event_queue.put(
+                    Event(
+                        SystemEvent(
+                            message="(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.",
+                        )
+                    )
+                )
+        except Exception as e:
+            await runtime.event_queue.put(
                 Event(
-                    SystemEvent(
-                        message="(SYSTEM) Personality optimisations and auxiliary memory updates complete. Interaction summary has been updated and older messages have been truncated.",
+                    ErrorEvent(
+                        message=traceback.format_exc(),
                     )
                 )
             )
@@ -681,10 +700,19 @@ async def cleanup_session(runtime: SessionRuntime, agent_id: UUID, user_id: UUID
         if runtime.event_queue.qsize() > 0 and runtime.exited:
             return
 
-        run_outer_loop(
-            runtime=runtime,
-            agent_id=agent_id,
-        )
+        try:
+            run_outer_loop(
+                runtime=runtime,
+                agent_id=agent_id,
+            )
+        except Exception as e:
+            await runtime.event_queue.put(
+                Event(
+                    ErrorEvent(
+                        message=traceback.format_exc(),
+                    )
+                )
+            )
 
         await runtime.event_queue.put(Event(ExitEvent()))
         runtime.exited = True

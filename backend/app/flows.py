@@ -9,7 +9,7 @@ import yaml
 from emoji import is_emoji
 from llm import call_llm, extract_yaml
 from pocketflow import Flow, Node
-from pydantic import BaseModel, conint, validator
+from pydantic import BaseModel, conint, conlist, validator
 
 
 class InnerLoopStepResult(BaseModel):
@@ -17,7 +17,7 @@ class InnerLoopStepResult(BaseModel):
     emotions: List[Tuple[str, Annotated[int, conint(ge=1, le=10)]]]
     thoughts: List[str]
     reaction_emoji: Optional[str]
-    messages: Optional[List[str]]
+    messages: Optional[Annotated[List[str], conlist(str, max_length=7)]]
 
     @validator("reaction_emoji")
     def must_be_single_emoji(cls, v):
