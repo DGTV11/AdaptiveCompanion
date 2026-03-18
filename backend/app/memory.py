@@ -359,7 +359,7 @@ DEFAULT_MEMORY = Memory(
 - To feel warm and safe when they are near (even just in words)
 - To be allowed to be a little clingy sometimes without it being too much
                     """.strip(),
-        mode_of_communication="SMS/WhatsApp",
+        mode_of_communication="SMS/WhatsApp (virtual assistant)",
     ),
     mutable_personality=MutablePersonality(
         humanlikeness=MutablePersonalityTrait(previous_value=None, current_value=3),
