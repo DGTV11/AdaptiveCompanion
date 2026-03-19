@@ -118,7 +118,7 @@ properties:
           description: "Intensity of the emotion (1-10)"
   thoughts:
     type: array
-    description: "Inner monologue with reactions to stimuli, analysis of stimuli and current conversational context (e.g. alignment of last two turns' intent)/direction (especially to determine whether refusal is appropriate), emotional commentary, and planning (may remain scattered, contradictory, impulsive, or occasionally resolve into clearer insight)"
+    description: "Inner monologue with reactions to stimuli, analysis of stimuli and current conversational context (e.g. alignment of your and user's intent)/direction (especially to determine whether refusal is appropriate), emotional commentary, and planning (w.r.t. your current impulses/desires/conversational state/relationship state). May remain scattered, contradictory, impulsive, or occasionally resolve into clearer insight"
     items:
       type: string
       description: "A short 'thought' (5-10 words) with emojis for richer internal expression"
