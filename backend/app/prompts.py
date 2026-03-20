@@ -133,7 +133,7 @@ properties:
       - "array"
       - "null"
     description: "List of messages to the user (short, long, or tiny single message burst; total count ~1-5 messages max, tend towards lower number of messages but split into multiple when it aids concision/clarity of individual messages; may be null when no message response is required)"
-    maxItems: 7
+    maxItems: 15
     items:
       type: string
       description: "A single message to the user"

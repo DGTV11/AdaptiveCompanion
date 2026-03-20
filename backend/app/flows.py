@@ -17,7 +17,7 @@ class InnerLoopStepResult(BaseModel):
     emotions: List[Tuple[str, Annotated[int, conint(ge=1, le=10)]]]
     thoughts: List[str]
     reaction_emoji: Optional[str]
-    messages: Optional[Annotated[List[str], conlist(str, max_length=7)]]
+    messages: Optional[Annotated[List[str], conlist(str, max_length=15)]]
 
     @validator("reaction_emoji")
     def must_be_single_emoji(cls, v):
