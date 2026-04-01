@@ -1,5 +1,7 @@
+import requests
 from textual.app import App, ComposeResult
 from textual.containers import Grid, Horizontal
+from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Input, Label
 
@@ -24,15 +26,24 @@ class LoginScreen(ModalScreen):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "login-btn":
-            username = self.username_input.value
-            password = self.password_input.value
-            print(username, password)  # TODO: send request to backend
-            # TODO: make sign in form
+            response = requests.post(
+                "http://backend:5556/token",
+                data={
+                    "username": self.username_input.value,
+                    "password": self.password_input.value,
+                },
+            )
+            if response.status_code != 200:
+                raise Exception("TODO: Incorrect username or password error")
+
+            self.dismiss(response.json()["access_token"])
 
 
 class AdaptiveCompanion(App):
     CSS_PATH = "styles.tcss"
     BINDINGS = [("l", "login", "Log in")]
+
+    headers = reactive(dict)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -40,7 +51,10 @@ class AdaptiveCompanion(App):
         yield Footer()
 
     def action_login(self) -> None:
-        self.push_screen(LoginScreen())
+        def update_access_token(access_token: str):
+            self.headers["Authorization"] = f"Bearer {access_token}"
+
+        self.push_screen(LoginScreen(), update_access_token)
 
 
 if __name__ == "__main__":
