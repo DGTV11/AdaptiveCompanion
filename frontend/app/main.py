@@ -43,7 +43,7 @@ class AdaptiveCompanion(App):
     CSS_PATH = "styles.tcss"
     BINDINGS = [("l", "login", "Log in")]
 
-    headers = reactive(dict)
+    headers = reactive({"Authorization": None})
 
     def compose(self) -> ComposeResult:
         yield Header()
