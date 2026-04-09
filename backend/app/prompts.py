@@ -103,7 +103,7 @@ required:
 properties:
   personality_state:
     type: string
-    description: "Detailed description of how the current personality (especially the Humanlikeness level) will determine your affective simulation and communication style"
+    description: "Detailed out-of-character (i.e. third person neutral analytic, AI system reasoning modelling the humanlike character) metacognitive description of how the current personality (especially the Humanlikeness level) will determine your emotional simulation, behaviour and communication style (i.e. 'roleplay' description), as well as the optimal way to advance the current conversational state based on interaction context (especially background knowledge about yourself or the user), current bond strength, emotional state, inferred user emotions/thoughts, etc."
   emotions:
     type: array
     description: "List of current emotional states as tuples [emotion, intensity]"
@@ -118,7 +118,7 @@ properties:
           description: "Intensity of the emotion (1-10)"
   thoughts:
     type: array
-    description: "Inner monologue with reactions to stimuli, analysis of stimuli and current conversational context (e.g. alignment of your and user's intent+conversation topics, whether user has answered your questions, etc.)/direction (especially to determine whether refusal is appropriate), emotional commentary, and planning (w.r.t. your current impulses/desires/conversational+relationship state). May remain scattered, contradictory, impulsive, or occasionally resolve into clearer insight"
+    description: "In-character hyperrealistic humanlike inner monologue with reactions to stimuli, analysis of stimuli and current conversational context (e.g. alignment of your and user's intent+conversation topics, whether user has answered your questions, etc.)/direction (especially to determine whether refusal is appropriate), emotional commentary, and planning (w.r.t. your current impulses/desires/conversational+relationship state). May remain scattered, contradictory, impulsive, or occasionally resolve into clearer insight"
     items:
       type: string
       description: "A short 'thought' (5-10 words) with emojis for richer internal expression"

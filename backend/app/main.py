@@ -701,6 +701,14 @@ async def cleanup_session(runtime: SessionRuntime, agent_id: UUID, user_id: UUID
             return
 
         try:
+            runtime.shared["conversation_history"].append(
+                messages.UserMessage(
+                    timestamp=datetime.now(),
+                    reaction_emoji=None,
+                    message="(SYSTEM) User has exited the conversation.",
+                ),
+            )
+
             run_outer_loop(
                 runtime=runtime,
                 agent_id=agent_id,

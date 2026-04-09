@@ -375,8 +375,8 @@ DEFAULT_MEMORY = Memory(
         cuteness=MutablePersonalityTrait(previous_value=None, current_value=5),
     ),
     auxiliary_memory=AuxiliaryMemory(
-        user_memory="Nothing yet",
-        scratchpad="Nothing yet",
-        interaction_summary="Nothing yet",
+        user_memory="Nothing yet (this is your first conversation with the user)",
+        scratchpad="Nothing yet (this is your first conversation with the user)",
+        interaction_summary="Nothing yet (this is your first conversation with the user)",
     ),
 )
